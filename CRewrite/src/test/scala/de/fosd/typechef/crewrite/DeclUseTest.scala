@@ -142,6 +142,12 @@ class DeclUseTest extends ConditionalNavigation with ASTNavigation with CDeclUse
         runDefUseOnAst(source_ast)
     }
 
+    @Test def test_forward_declared_struct {
+        val source_ast = getAstFromPi(new File(decluseTestPath + "struct_forwarddeclared.c"))
+        println(source_ast)
+        runDefUseOnAst(source_ast)
+    }
+
     @Test def test_sizeof_tags {
         val source_ast = getAstFromPi(new File(decluseTestPath + "sizeof_tags.c"))
         println(source_ast)
