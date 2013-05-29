@@ -41,9 +41,6 @@ trait CDeclUse extends CEnv with CEnvCache {
     }
 
     private def addToDeclUseMap(decl: Id, use: Id): Any = {
-        if (use.name.equals("_IO_FILE")) {
-            print("")
-        }
         if (decl.eq(use) && !declUseMap.containsKey(decl)) {
             putToDeclUseMap(decl)
         }
@@ -506,7 +503,7 @@ trait CDeclUse extends CEnv with CEnvCache {
                                 case None =>
                                 case Some(i: Id) =>
                                     if (enum.equals(None)) {
-                                        addStructDeclUse(i, env, isUnion, structSpecFeature)
+                                        //addStructDeclUse(i, env, isUnion, structSpecFeature)
                                     }
                                 case _ =>
                             }
@@ -660,7 +657,7 @@ trait CDeclUse extends CEnv with CEnvCache {
                 }
                 extensions.foreach(x => addDecl(x, featureExpr, env))
             case StructOrUnionSpecifier(_, None, Some(extensions)) =>
-                extensions.foreach(x => addDecl(x, featureExpr, env))
+                extensions.foreach(x => addDecl(x.entry, featureExpr, env))
             case StructDeclarator(decl, i: Id, _) =>
                 addDefinition(i, env)
             case ExprStatement(expr) =>

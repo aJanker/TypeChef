@@ -337,24 +337,8 @@ trait CDeclTyping extends CTypes with CEnv with CTypeSystemInterface with CDeclU
         var result = List[(String, FeatureExpr, AST, Conditional[CType], DeclarationKind)]()
         for (Opt(f, spec) <- specs) spec match {
             case EnumSpecifier(_, Some(enums)) =>
-                for (Opt(feat, entry: Enumerator) <- enums) {
-                    addDecl(entry, feat, env)
-                }
-                /*enums match {
-                    case BuiltinOffsetof(TypeName(specs, decl), offsetMember) =>
-                        for (Opt(f, TypeDefTypeSpecifier(name)) <- specs) {
-                            addTypeUse(name, env, featureExpr)
-                        }
-                    case _ =>
-                }*/
                 for (Opt(f2, enum) <- enums) {
-                    /*enum match {
-                        case Enumerator(_, Some(BuiltinOffsetof(TypeName(specs, decl), offsetMember))) =>
-                            for (Opt(f, TypeDefTypeSpecifier(name)) <- specs) {
-                                addTypeUse(name, env, featureExpr)
-                            }
-                        case _ =>
-                    }*/
+                    addDecl(enum, f2 and featureExpr, env)
                     result = (enum.id.name, featureExpr and f and f2, enum, One(CSigned(CInt())), KEnumVar) :: result
                 }
             //recurse into structs
