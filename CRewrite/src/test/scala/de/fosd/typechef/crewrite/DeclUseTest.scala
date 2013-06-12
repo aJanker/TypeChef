@@ -158,8 +158,8 @@ class DeclUseTest extends ConditionalNavigation with ASTNavigation with CDeclUse
         val source_ast = getAstFromPi(new File(decluseTestPath + "struct_forwarddeclared.c"))
         println(source_ast)
         val result = runDefUseOnAst(source_ast)
-        val numberOfDefinitions = 15
-        val numberOfEntries = 4
+        val numberOfDefinitions = 14
+        val numberOfEntries = 5
         val numberOfVariableIds = 0
         assert(result ==(numberOfDefinitions, numberOfEntries, numberOfVariableIds))
     }
@@ -178,8 +178,8 @@ class DeclUseTest extends ConditionalNavigation with ASTNavigation with CDeclUse
         val source_ast = getAstFromPi(new File(decluseTestPath + "__builtin_offsetof_typedef_struct_union.c"))
         println(source_ast)
         val result = runDefUseOnAst(source_ast)
-        val numberOfDefinitions = 7
-        val numberOfEntries = 1
+        val numberOfDefinitions = 10
+        val numberOfEntries = 5
         val numberOfVariableIds = 0
         assert(result ==(numberOfDefinitions, numberOfEntries, numberOfVariableIds))
     }
@@ -194,7 +194,17 @@ class DeclUseTest extends ConditionalNavigation with ASTNavigation with CDeclUse
         assert(result ==(numberOfDefinitions, numberOfEntries, numberOfVariableIds))
     }
 
-    @Test def test_gzip_pi {
+    @Test def test_linked_struct {
+        val source_ast = getAstFromPi(new File(decluseTestPath + "linked_struct.c"))
+        println(source_ast)
+        val result = runDefUseOnAst(source_ast)
+        val numberOfDefinitions = 5
+        val numberOfEntries = 2
+        val numberOfVariableIds = 0
+        assert(result ==(numberOfDefinitions, numberOfEntries, numberOfVariableIds))
+    }
+
+    @Test def test_rpm_pi {
         val source_ast = getAstFromPi(new File("../TypeChef-BusyboxAnalysis/busybox-1.18.5/" + "archival/rpm.pi"))
         runDefUseOnAst(source_ast)
     }

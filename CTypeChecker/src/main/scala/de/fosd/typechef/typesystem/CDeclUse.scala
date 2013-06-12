@@ -35,6 +35,9 @@ trait CDeclUse extends CEnv with CEnvCache {
     private val newIdentifierName = "rnd_ident"
 
     private def putToDeclUseMap(decl: Id) = {
+        if (decl.name.equals("u")) {
+            print("")
+        }
         if (!declUseMap.contains(decl)) {
             declUseMap.put(decl, Collections.newSetFromMap[Id](new util.IdentityHashMap()))
         }
@@ -89,6 +92,17 @@ trait CDeclUse extends CEnv with CEnvCache {
             })
             case _ => logger.error("Missed ForwardDeclaration of: " + definition)
         }
+    }
+
+    def addRedefinition(redefinition: Id, definition: Id, env: Env, feature: FeatureExpr = FeatureExprFactory.True) {
+        val usageList = declUseMap.get(definition)
+
+        declUseMap.remove(definition)
+        usageList.foreach(x => useDeclMap.remove(x))
+
+        putToDeclUseMap(redefinition)
+        addToDeclUseMap(redefinition, definition)
+        usageList.foreach(x => addToDeclUseMap(redefinition, x))
     }
 
     private def addFunctionDeclaration(env: Env, declaration: Id, feature: FeatureExpr) {
@@ -482,6 +496,18 @@ trait CDeclUse extends CEnv with CEnvCache {
                                 }
                             })
                     }
+                } else if (env.structEnv.someDefinition(name, !isUnion)) {
+                    env.structEnv.getId(name, !isUnion) match {
+                        case o@One(key: Id) =>
+                            addOne(o, use)
+                        case c@Choice(_, _, _) =>
+                            val tuple = conditionalToTuple(c)
+                            tuple.foreach(x => {
+                                if (feature.equivalentTo(FeatureExprFactory.True) || feature.implies(x._1).isTautology) {
+                                    addToDeclUseMap(x._2.asInstanceOf[Id], use)
+                                }
+                            })
+                    }
                 } else {
                     addDefinition(use, env)
                 }
@@ -503,7 +529,7 @@ trait CDeclUse extends CEnv with CEnvCache {
                                 case None =>
                                 case Some(i: Id) =>
                                     if (enum.equals(None)) {
-                                        //addStructDeclUse(i, env, isUnion, structSpecFeature)
+                                        addStructDeclUse(i, env, isUnion, structSpecFeature)
                                     }
                                 case _ =>
                             }
@@ -630,7 +656,8 @@ trait CDeclUse extends CEnv with CEnvCache {
                 typeName.specifiers.foreach(x => addDecl(x.entry, featureExpr, env))
                 members.foreach(x => addDecl(x.entry, featureExpr, env))
             case OffsetofMemberDesignatorID(i) =>
-                addDecl(i, featureExpr, env)
+                addStructDeclUse(i, env, false, featureExpr)
+                addStructDeclUse(i, env, true, featureExpr)
             case TypeDefTypeSpecifier(name: Id) =>
                 addTypeUse(name, env, featureExpr)
             case DeclArrayAccess(Some(o)) =>
@@ -680,8 +707,10 @@ trait CDeclUse extends CEnv with CEnvCache {
             case Some(o) => addDecl(o, featureExpr, env)
             case NAryExpr(expr, others) =>
                 expr match {
-                    case Id(_) => addUse(expr, featureExpr, env)
-                    case k => addUse(k, featureExpr, env)
+                    case Id(_) =>
+                        addUse(expr, featureExpr, env)
+                    case k =>
+                    //addDecl(expr, featureExpr, env)
                 }
                 others.foreach(x => addDecl(x.entry, featureExpr, env))
             case NArySubExpr(_, expr) =>

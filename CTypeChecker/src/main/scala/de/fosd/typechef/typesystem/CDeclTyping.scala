@@ -85,8 +85,10 @@ trait CDeclTyping extends CTypes with CEnv with CTypeSystemInterface with CDeclU
     }
 
     def getTypenameType(typename: TypeName, featureExpr: FeatureExpr, env: Env): Conditional[CType] = typename match {
-        case TypeName(specs, None) => constructType(specs, featureExpr, env, typename)
-        case TypeName(specs, Some(decl)) => getAbstractDeclaratorType(decl, constructType(specs, featureExpr, env, typename), featureExpr, env)
+        case TypeName(specs, None) =>
+            constructType(specs, featureExpr, env, typename)
+        case TypeName(specs, Some(decl)) =>
+            getAbstractDeclaratorType(decl, constructType(specs, featureExpr, env, typename), featureExpr, env)
     }
 
 
@@ -138,11 +140,14 @@ trait CDeclTyping extends CTypes with CEnv with CTypeSystemInterface with CDeclU
         var types = List[Conditional[CType]]()
         for (specifier <- specifiers) specifier match {
             case StructOrUnionSpecifier(isUnion, Some(id), _) =>
-                addStructDeclUse(id, env, isUnion, featureExpr)
-                if (hasTransparentUnionAttribute(specifiers))
+                //addStructDeclUse(id, env, isUnion, featureExpr)
+                if (hasTransparentUnionAttribute(specifiers)) {
                     types = types :+ One(CIgnore()) //ignore transparent union for now
-                else
+
+                } else {
+                    addStructDeclUse(id, env, isUnion, featureExpr)
                     types = types :+ One(CStruct(id.name, isUnion))
+                }
             case StructOrUnionSpecifier(isUnion, None, members) =>
                 if (hasTransparentUnionAttribute(specifiers))
                     types = types :+ One(CIgnore()) //ignore transparent union for now
