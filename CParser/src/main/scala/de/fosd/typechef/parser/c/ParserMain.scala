@@ -1,13 +1,12 @@
 package de.fosd.typechef.parser.c
 
+import java.io.{File, FileWriter}
+
+import de.fosd.typechef.conditional.Opt
+import de.fosd.typechef.error.Position
+import de.fosd.typechef.featureexpr.FeatureExprFactory.True
 import de.fosd.typechef.featureexpr._
 import de.fosd.typechef.parser._
-import java.io.{FileWriter, File}
-import FeatureExprFactory.True
-import java.util.Collections
-import de.fosd.typechef.error.Position
-import de.fosd.typechef.conditional.Opt
-import de.fosd.typechef.lexer.LexerFrontend
 
 object MyUtil {
     implicit def runnable(f: () => Unit): Runnable =
@@ -101,7 +100,60 @@ class ParserMain(p: CParser) {
         //return null (if parsing failed in all branches) or a single AST combining all parse results
         mergeResultsIntoSingleAST(ctx, result)
     }
-
+    def renderParseResult[T](result: p.MultiParseResult[T], feature: FeatureExpr, renderError: (FeatureExpr, String, Position) => Object): Unit =
+        if (renderError != null)
+            result.mapfr(feature, {
+                case (f, x@p.Success(ast, unparsed)) => x
+                case (f, x@p.NoSuccess(msg, unparsed, inner)) =>
+                    renderError(f, msg + " (" + inner + ")", unparsed.pos); x
+            })
+    def printParseResult(result: p.MultiParseResult[Any], feature: FeatureExpr): String = {
+        result match {
+            case p.Success(ast, unparsed) =>
+                (feature.toString + "\tparsing succeeded")
+            case p.NoSuccess(msg, unparsed, inner) =>
+                (feature.toString + "\tfailed: " + msg + " at " + unparsed.pos + " (" + inner + ")\n")
+            case p.SplittedParseResult(f, left, right) => {
+                printParseResult(left, feature.and(f)) + "\n" +
+                    printParseResult(right, feature.and(f.not))
+            }
+        }
+    }
+    def countConditionalTokens(tokens: List[AbstractToken]): Int =
+        tokens.count(_.getFeature != FeatureExprFactory.True)
+    def printDistinctFeatures(tokens: List[AbstractToken], filename: String) {
+        val w = new FileWriter(new File(filename))
+        w.write(getDistinctFeatures(tokens).toList.sorted.mkString("\n"))
+        w.close()
+    }
+    def getDistinctFeatures(tokens: List[AbstractToken]): Set[String] = {
+        var features: Set[String] = Set()
+        for (t <- tokens)
+            features ++= t.getFeature.collectDistinctFeatures
+        features
+    }
+    def countFeatureExpr(tokens: List[AbstractToken]): Int =
+        tokens.foldLeft[Set[FeatureExpr]](Set())(_ + _.getFeature).size
+    def countChoiceNodes(ast: p.MultiParseResult[AST]): Int = ast match {
+        case p.Success(ast, _) => countChoices(ast)
+        case _ => -1
+    }
+    def countChoices(ast: AST): Int = {
+        var result: Int = 0
+        //        ast.accept(new ASTVisitor {
+        //            def visit(node: AST, ctx: FeatureExpr) {
+        //                if (node.isInstanceOf[Choice[_]])
+        //                    result += 1
+        //                for (opt <- node.getInnerOpt)
+        //                    if (opt.feature != FeatureExprFactory.True && opt.feature != ctx)
+        //                        if (!((ctx implies (opt.feature)).isTautology)) {
+        //                            result += 1
+        //                        }
+        //            }
+        //            def postVisit(node: AST, feature: FeatureExpr) {}
+        //        })
+        result
+    }
     /**
      * merges multiple results into a single AST (possibly empty)
      *
@@ -127,72 +179,6 @@ class ParserMain(p: CParser) {
 
         if (result.allFailed) null
         else TranslationUnit(collectTopLevelDeclarations(ctx, result))
-    }
-
-
-    def renderParseResult[T](result: p.MultiParseResult[T], feature: FeatureExpr, renderError: (FeatureExpr, String, Position) => Object): Unit =
-        if (renderError != null)
-            result.mapfr(feature, {
-                case (f, x@p.Success(ast, unparsed)) => x
-                case (f, x@p.NoSuccess(msg, unparsed, inner)) =>
-                    renderError(f, msg + " (" + inner + ")", unparsed.pos); x
-            })
-
-    def printParseResult(result: p.MultiParseResult[Any], feature: FeatureExpr): String = {
-        result match {
-            case p.Success(ast, unparsed) =>
-                (feature.toString + "\tparsing succeeded\n")
-            case p.NoSuccess(msg, unparsed, inner) =>
-                (feature.toString + "\tfailed: " + msg + " at " + unparsed.pos + " (" + inner + ")\n")
-            case p.SplittedParseResult(f, left, right) => {
-                printParseResult(left, feature.and(f)) + "\n" +
-                    printParseResult(right, feature.and(f.not))
-            }
-        }
-    }
-
-
-    def countConditionalTokens(tokens: List[AbstractToken]): Int =
-        tokens.count(_.getFeature != FeatureExprFactory.True)
-
-    def getDistinctFeatures(tokens: List[AbstractToken]): Set[String] = {
-        var features: Set[String] = Set()
-        for (t <- tokens)
-            features ++= t.getFeature.collectDistinctFeatures
-        features
-    }
-
-
-    def printDistinctFeatures(tokens: List[AbstractToken], filename: String) {
-        val w = new FileWriter(new File(filename))
-        w.write(getDistinctFeatures(tokens).toList.sorted.mkString("\n"))
-        w.close()
-    }
-
-    def countFeatureExpr(tokens: List[AbstractToken]): Int =
-        tokens.foldLeft[Set[FeatureExpr]](Set())(_ + _.getFeature).size
-
-    def countChoiceNodes(ast: p.MultiParseResult[AST]): Int = ast match {
-        case p.Success(ast, _) => countChoices(ast)
-        case _ => -1
-    }
-
-
-    def countChoices(ast: AST): Int = {
-        var result: Int = 0
-        //        ast.accept(new ASTVisitor {
-        //            def visit(node: AST, ctx: FeatureExpr) {
-        //                if (node.isInstanceOf[Choice[_]])
-        //                    result += 1
-        //                for (opt <- node.getInnerOpt)
-        //                    if (opt.feature != FeatureExprFactory.True && opt.feature != ctx)
-        //                        if (!((ctx implies (opt.feature)).isTautology)) {
-        //                            result += 1
-        //                        }
-        //            }
-        //            def postVisit(node: AST, feature: FeatureExpr) {}
-        //        })
-        result
     }
 
     /* match {
