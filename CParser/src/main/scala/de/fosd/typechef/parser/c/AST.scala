@@ -1,7 +1,7 @@
 package de.fosd.typechef.parser.c
 
 import de.fosd.typechef.conditional._
-import de.fosd.typechef.error.{WithPosition, Position}
+import de.fosd.typechef.error.{Position, WithPosition}
 
 /**
  * AST for C
@@ -231,6 +231,7 @@ case class ThreadSpecifier() extends OtherSpecifier()
 
 case class StaticSpecifier() extends OtherSpecifier()
 
+case class Comment(content: String) extends Statement with ExternalDef
 
 abstract class Attribute() extends AST
 

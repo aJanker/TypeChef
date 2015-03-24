@@ -1,32 +1,15 @@
 package de.fosd.typechef.parser.c
 
-import de.fosd.typechef.conditional._
-import de.fosd.typechef.featureexpr.{FeatureExprFactory, FeatureExpr}
 import java.io.{FileWriter, StringWriter, Writer}
+
+import de.fosd.typechef.conditional._
+import de.fosd.typechef.featureexpr.{FeatureExpr, FeatureExprFactory}
 
 object PrettyPrinter {
 
-    //pretty printer combinators, stolen from http://www.scala-blogs.org/2009/04/combinators-for-pretty-printers-part-1.html
-    sealed abstract class Doc {
-        def ~(that: Doc) = Cons(this, that)
-
-        def ~~(that: Doc) = this ~ space ~ that
-
-        def *(that: Doc) = this ~ line ~ that
-
-        def ~>(that: Doc) = this ~ nest(2, line ~ that)
-    }
-
-    case object Empty extends Doc
-
-    case object Line extends Doc
-
-    case class Text(s: String) extends Doc
-
-    case class Cons(left: Doc, right: Doc) extends Doc
-
-    case class Nest(n: Int, d: Doc) extends Doc
-
+    val line = Line
+    val space = Text(" ")
+    var newLineForIfdefs = true
     implicit def string(s: String): Doc = Text(s)
     /** Determines whether the doc has some content other than spaces
       */
@@ -45,15 +28,8 @@ object PrettyPrinter {
             case _ => true
         }
     }
-
-    val line = Line
-    val space = Text(" ")
-    var newLineForIfdefs = true
-
     def nest(n: Int, d: Doc) = Nest(n, d)
-
     def block(d: Doc): Doc = "{" ~> d * "}"
-
     def layout(d: Doc): String = d match {
         case Empty => ""
         case Line => "\n"
@@ -65,12 +41,10 @@ object PrettyPrinter {
         case Nest(n, Cons(l, r)) => layout(Cons(Nest(n, l), Nest(n, r)))
         case Nest(i, Nest(j, x)) => layout(Nest(i + j, x))
     }
-
     // old version causing stack overflows and pretty slow
     //def print(ast: AST): String = layout(prettyPrint(ast))
     // new awesome fast version using a string writer instance
     def print(ast: AST): String = printW(ast, new StringWriter()).toString
-
     def layoutW(d: Doc, p: Writer): Unit = d match {
         case Empty => p.write("")
         case Line => p.write("\n")
@@ -85,19 +59,16 @@ object PrettyPrinter {
         case Nest(i, Nest(j, x)) => layoutW(Nest(i + j, x), p)
         case _ =>
     }
-
     def printW(ast: AST, writer: Writer): Writer = {
         layoutW(prettyPrint(ast), writer)
         writer
     }
-
     def printF(ast: AST, path: String, prefix: String = "") = {
         val writer = new FileWriter(path)
         writer.write(prefix)
         layoutW(prettyPrint(ast), writer)
         writer.close()
     }
-
     def printD(ast: AST, path: String, prefix: String = "") = {
         val prettyPrinted = PrettyPrinter.print(ast).replace("definedEx", "defined")
         val writer = new FileWriter(path, false)
@@ -106,7 +77,6 @@ object PrettyPrinter {
         writer.flush()
         writer.close()
     }
-
     def ppConditional(e: Conditional[_], list_feature_expr: List[FeatureExpr]): Doc = e match {
         case One(c: AST) => prettyPrint(c, list_feature_expr)
         case Choice(f, a: AST, b: AST) =>
@@ -143,43 +113,6 @@ object PrettyPrinter {
                     "#endif"
             }
     }
-
-    private def optConditional(e: Opt[AST], list_feature_expr: List[FeatureExpr]): Doc = {
-        if (e.feature == FeatureExprFactory.True ||
-            list_feature_expr.foldLeft(FeatureExprFactory.True)(_ and _).implies(e.feature).isTautology())
-            prettyPrint(e.entry, list_feature_expr)
-        else if (newLineForIfdefs) {
-            line ~
-                "#if" ~~ e.feature.toTextExpr *
-                prettyPrint(e.entry, e.feature :: list_feature_expr) *
-                "#endif" ~
-                    line
-        } else {
-            "#if" ~~ e.feature.toTextExpr *
-                prettyPrint(e.entry, e.feature :: list_feature_expr) *
-                "#endif"
-        }
-
-    }
-
-    private def optConditionalStr(e: Opt[String], list_feature_expr: List[FeatureExpr]): Doc = {
-        if (e.feature == FeatureExprFactory.True ||
-            list_feature_expr.foldLeft(FeatureExprFactory.True)(_ and _).implies(e.feature).isTautology())
-            e.entry
-        else if (newLineForIfdefs) {
-            line ~
-                "#if" ~~ e.feature.toTextExpr *
-                e.entry *
-                "#endif" ~
-                    line
-        } else {
-            "#if" ~~ e.feature.toTextExpr *
-                e.entry *
-                "#endif"
-        }
-
-    }
-
     def prettyPrint(ast: AST, list_feature_expr: List[FeatureExpr] = List(FeatureExprFactory.True)): Doc = {
         implicit def pretty(a: AST): Doc = prettyPrint(a, list_feature_expr)
         implicit def prettyOpt(a: Opt[AST]): Doc = optConditional(a, list_feature_expr)
@@ -524,11 +457,64 @@ object PrettyPrinter {
             case BuiltinVaArgs(expr: Expr, typeName: TypeName) => "__builtin_va_arg(" ~ expr ~ "," ~~ typeName ~ ")"
             case CompoundStatementExpr(compoundStatement: CompoundStatement) => "(" ~ compoundStatement ~ ")"
             case Pragma(command: StringLit) => "_Pragma(" ~ command ~ ")"
+            case Comment(content: String) => "// " ~ content
 
             case e =>
                 assert(assertion = false, message = "match not exhaustive: " + e); ""
         }
     }
+    private def optConditional(e: Opt[AST], list_feature_expr: List[FeatureExpr]): Doc = {
+        if (e.feature == FeatureExprFactory.True ||
+            list_feature_expr.foldLeft(FeatureExprFactory.True)(_ and _).implies(e.feature).isTautology())
+            prettyPrint(e.entry, list_feature_expr)
+        else if (newLineForIfdefs) {
+            line ~
+                "#if" ~~ e.feature.toTextExpr *
+                prettyPrint(e.entry, e.feature :: list_feature_expr) *
+                "#endif" ~
+                    line
+        } else {
+            "#if" ~~ e.feature.toTextExpr *
+                prettyPrint(e.entry, e.feature :: list_feature_expr) *
+                "#endif"
+        }
+
+    }
+    private def optConditionalStr(e: Opt[String], list_feature_expr: List[FeatureExpr]): Doc = {
+        if (e.feature == FeatureExprFactory.True ||
+            list_feature_expr.foldLeft(FeatureExprFactory.True)(_ and _).implies(e.feature).isTautology())
+            e.entry
+        else if (newLineForIfdefs) {
+            line ~
+                "#if" ~~ e.feature.toTextExpr *
+                e.entry *
+                "#endif" ~
+                    line
+        } else {
+            "#if" ~~ e.feature.toTextExpr *
+                e.entry *
+                "#endif"
+        }
+
+    }
+
+    //pretty printer combinators, stolen from http://www.scala-blogs.org/2009/04/combinators-for-pretty-printers-part-1.html
+    sealed abstract class Doc {
+        def ~~(that: Doc) = this ~ space ~ that
+        def *(that: Doc) = this ~ line ~ that
+        def ~>(that: Doc) = this ~ nest(2, line ~ that)
+        def ~(that: Doc) = Cons(this, that)
+    }
+
+    case class Text(s: String) extends Doc
+
+    case class Cons(left: Doc, right: Doc) extends Doc
+
+    case class Nest(n: Int, d: Doc) extends Doc
+
+    case object Empty extends Doc
+
+    case object Line extends Doc
 
 
 }
