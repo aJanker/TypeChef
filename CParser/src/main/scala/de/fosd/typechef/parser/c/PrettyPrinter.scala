@@ -360,9 +360,9 @@ object PrettyPrinter {
                     sep(declSpecs, _ ~~ _) ~~ sepVaware(init, ",") ~ ";"
                 else
                 if (declSpecs.isEmpty && init.isEmpty)
-                    "/*" ~ seps(comments.map(x => Opt(FeatureExprFactory.True, x)), _ ~ "*/" * "/*" ~ _) ~ "*/"
+                    "/*" ~ seps(comments, _ ~ "*/" * "/*" ~ _) ~ "*/"
                 else
-                    "/*" ~ seps(comments.map(x => Opt(FeatureExprFactory.True, x)), _ ~ "*/" * "/*" ~ _) ~ "*/" ~
+                    "/*" ~ seps(comments, _ ~ "*/" * "/*" ~ _) ~ "*/" *
                         sep(declSpecs, _ ~~ _) ~~ sepVaware(init, ",") ~ ";"
             case InitDeclaratorI(declarator, lst, Some(i)) =>
                 if (!lst.isEmpty) {
@@ -507,8 +507,8 @@ object PrettyPrinter {
     //pretty printer combinators, stolen from http://www.scala-blogs.org/2009/04/combinators-for-pretty-printers-part-1.html
     sealed abstract class Doc {
         def ~~(that: Doc) = this ~ space ~ that
-        def *(that: Doc) = this ~ line ~ that
         def ~(that: Doc) = Cons(this, that)
+        def *(that: Doc) = this ~ line ~ that
         def ~>(that: Doc) = this ~ nest(2, line ~ that)
     }
 
