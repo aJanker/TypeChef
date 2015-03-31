@@ -201,7 +201,7 @@ trait CDeclUse extends CDeclUseInterface with CEnv with CEnvCache {
                 case One(AtomicNamedDeclarator(_, key, _)) => addToDeclUseMap(key, use)
                 case One(FunctionDef(_, AtomicNamedDeclarator(_, key, _), _, _)) => addToDeclUseMap(key, use)
                 case One(Enumerator(key, _)) => addToDeclUseMap(key, use)
-                case One(Declaration(specifiers, inits)) =>
+                case One(Declaration(specifiers, inits, _)) =>
                     inits.foreach(x => x match {
                         case Opt(_, entry) => addOne(One(entry), use, env)
                         case _ =>
@@ -299,7 +299,7 @@ trait CDeclUse extends CDeclUseInterface with CEnv with CEnvCache {
                                         addToDeclUseMap(stringToIdMap.get(i.name).get, i)
                                     } else if (!(typedefspecifier == null)) {
                                         env.typedefEnv.getAstOrElse(typedefspecifier.name, null) match {
-                                            case One(Declaration(specs, decl)) =>
+                                            case One(Declaration(specs, decl, _)) =>
                                                 for (Opt(_, StructOrUnionSpecifier(_, None, Some(lst), _, _)) <- specs) {
                                                     for (Opt(_, StructDeclaration(qualis, structDecls)) <- lst) {
                                                         for (Opt(innerFeature, StructDeclarator(a: AtomicNamedDeclarator, _, _)) <- structDecls) {
@@ -451,7 +451,7 @@ trait CDeclUse extends CDeclUseInterface with CEnv with CEnvCache {
                         case One(null) =>
                         // addDefinition(i, env)
                         case c@Choice(_, _, _) =>
-                        case One(Declaration(List(Opt(_, _), Opt(_, s@StructOrUnionSpecifier(_, Some(id), _, _, _))), _)) =>
+                        case One(Declaration(List(Opt(_, _), Opt(_, s@StructOrUnionSpecifier(_, Some(id), _, _, _))), _, _)) =>
                             // TODO andreas: typedef name name // comment not specific
                             putToDeclUseMap(i)
                         case k =>

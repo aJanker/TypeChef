@@ -1,9 +1,8 @@
 package de.fosd.typechef.crewrite
 
+import de.fosd.typechef.conditional.{Conditional, ConditionalMap, Opt}
 import de.fosd.typechef.featureexpr.FeatureExpr
-import de.fosd.typechef.conditional.{Opt, ConditionalMap, Conditional}
 import de.fosd.typechef.parser.c._
-import scala.Some
 
 // interprocedural control flow graph (cfg) implementation based on the
 // intraprocedural cfg implementation (see IntraCFG.scala)
@@ -17,12 +16,11 @@ import scala.Some
 
 trait InterCFG extends IntraCFG {
 
+    private var functionDefs: ConditionalMap[String, Option[ExternalDef]] = new ConditionalMap[String, Option[ExternalDef]]
+    private var functionFExpr: Map[ExternalDef, FeatureExpr] = Map()
     // provide a lookup mechanism for function defs (from the type system or selfimplemented)
     // return None if function cannot be found
     def getTranslationUnit(): TranslationUnit
-
-    private var functionDefs: ConditionalMap[String, Option[ExternalDef]] = new ConditionalMap[String, Option[ExternalDef]]
-    private var functionFExpr: Map[ExternalDef, FeatureExpr] = Map()
 
     if (getTranslationUnit != null)
         for (Opt(f, externalDef) <- getTranslationUnit().defs) {
@@ -30,20 +28,17 @@ trait InterCFG extends IntraCFG {
             externalDef match {
                 case FunctionDef(_, decl, _, _) =>
                     functionDefs = functionDefs +(decl.getName, f, Some(externalDef))
-                case Declaration(_, initDecls) =>
+                case Declaration(_, initDecls, _) =>
                     for (Opt(fi, initDecl) <- initDecls) {
                         functionDefs = functionDefs +(initDecl.getName, f and fi, Some(externalDef))
                     }
                 case _ =>
             }
         }
-
-
     def externalDefFExprs = functionFExpr
-    def lookupFunctionDef(name: String): Conditional[Option[ExternalDef]] = {
-        functionDefs.getOrElse(name, None)
+    override def getExprSucc(exp: Expr, ctx: FeatureExpr, oldres: CFGRes, env: ASTEnv): CFGRes = {
+        findMethodCalls(exp, env, oldres, ctx, oldres) ++ super.getExprSucc(exp, ctx, oldres, env)
     }
-
     override private[crewrite] def findMethodCalls(t: AST, env: ASTEnv, oldres: CFGRes, ctx: FeatureExpr, _res: CFGRes): CFGRes = {
         var res: CFGRes = _res
         val postfixExprs = filterAllASTElems[PostfixExpr](t)
@@ -58,8 +53,7 @@ trait InterCFG extends IntraCFG {
         }
         res
     }
-
-    override def getExprSucc(exp: Expr, ctx: FeatureExpr, oldres: CFGRes, env: ASTEnv): CFGRes = {
-        findMethodCalls(exp, env, oldres, ctx, oldres) ++ super.getExprSucc(exp, ctx, oldres, env)
+    def lookupFunctionDef(name: String): Conditional[Option[ExternalDef]] = {
+        functionDefs.getOrElse(name, None)
     }
 }

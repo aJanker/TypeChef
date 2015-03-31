@@ -1,11 +1,11 @@
 package de.fosd.typechef.crewrite
 
-import de.fosd.typechef.parser.c._
-import de.fosd.typechef.featureexpr.{FeatureExprFactory, FeatureExpr}
-import de.fosd.typechef.conditional.Opt
-import de.fosd.typechef.parser.c.FunctionDef
 import java.io.Writer
 import java.util
+
+import de.fosd.typechef.conditional.Opt
+import de.fosd.typechef.featureexpr.FeatureExpr
+import de.fosd.typechef.parser.c.{FunctionDef, _}
 
 trait CFGWriter {
 
@@ -67,7 +67,7 @@ class DotGraph(fwriter: Writer) extends IOUtilities with CFGWriter {
         case FunctionDef(_, decl, _, _) => "Function " + o.getPositionFrom.getLine + ": " + decl.getName
         case s: Statement => "Stmt " + s.getPositionFrom.getLine + ": " + PrettyPrinter.print(s).take(20)
         case e: Expr => "Expr " + e.getPositionFrom.getLine + ": " + PrettyPrinter.print(e).take(20)
-        case Declaration(_, initDecl) => "Decl " + o.getPositionFrom.getLine + ": " + initDecl.map(_.entry.getName).mkString(", ")
+        case Declaration(_, initDecl, _) => "Decl " + o.getPositionFrom.getLine + ": " + initDecl.map(_.entry.getName).mkString(", ")
         case x => esc(PrettyPrinter.print(x)).take(20)
     }
 
@@ -178,7 +178,7 @@ class CFGCSVWriter(fwriter: Writer) extends IOUtilities with CFGWriter {
                 o.getPositionFrom.getLine + ";" + decl.getName
         case s: Statement => "statement;" + s.getPositionFrom.getLine + ";" + esc(PrettyPrinter.print(s).take(20))+"::"+containerName
         case e: Expr => "expression;" + e.getPositionFrom.getLine + ";" + esc(PrettyPrinter.print(e).take(20))+"::"+containerName
-        case Declaration(_, initDecl) => "declaration;" + o.getPositionFrom.getLine + ";" + initDecl.map(_.entry.getName).mkString(",")
+        case Declaration(_, initDecl, _) => "declaration;" + o.getPositionFrom.getLine + ";" + initDecl.map(_.entry.getName).mkString(",")
         case x => "unknown;" + x.getPositionFrom.getLine + ";" + esc(PrettyPrinter.print(x).take(20))+"::"+containerName
     }
 

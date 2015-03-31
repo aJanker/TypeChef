@@ -1,9 +1,8 @@
 package de.fosd.typechef.crewrite
 
-import org.kiama.attribution.Attribution._
-
-import de.fosd.typechef.parser.c._
 import de.fosd.typechef.conditional._
+import de.fosd.typechef.parser.c._
+import org.kiama.attribution.Attribution._
 
 // defines functions to compute sets for used, defined, and declared variables
 // used for Liveness and ReachingDefinitions
@@ -13,7 +12,7 @@ trait UsedDefinedDeclaredVariables {
     val declares: AnyRef => List[Id] =
         attr {
             case DeclarationStatement(decl) => declares(decl)
-            case Declaration(_, init) => init.flatMap(declares)
+            case Declaration(_, init, _) => init.flatMap(declares)
             case InitDeclaratorI(declarator, _, _) => declares(declarator)
             case AtomicNamedDeclarator(_, id, _) => List(id)
             case Opt(_, entry) => declares(entry.asInstanceOf[AnyRef])
@@ -25,7 +24,7 @@ trait UsedDefinedDeclaredVariables {
         attr {
             case AssignExpr(target: Id, _, source) => List(target)
             case DeclarationStatement(d) => defines(d)
-            case Declaration(_, init) => init.flatMap(defines)
+            case Declaration(_, init, _) => init.flatMap(defines)
             case InitDeclaratorI(i, _, _) => defines(i)
             case AtomicNamedDeclarator(_, i, _) => List(i)
             case ExprStatement(_: Id) => List()
@@ -45,7 +44,7 @@ trait UsedDefinedDeclaredVariables {
             case ReturnStatement(Some(x)) => uses(x)
             case WhileStatement(expr, _) => uses(expr)
             case DeclarationStatement(d) => uses(d)
-            case Declaration(_, init) => init.flatMap(uses)
+            case Declaration(_, init, _) => init.flatMap(uses)
             case InitDeclaratorI(_, _, Some(i)) => uses(i)
             case AtomicNamedDeclarator(_, id, _) => List(id)
             case NestedNamedDeclarator(_, nestedDecl, _, _) => uses(nestedDecl)
