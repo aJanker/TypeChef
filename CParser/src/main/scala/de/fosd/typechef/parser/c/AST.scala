@@ -231,7 +231,7 @@ case class ThreadSpecifier() extends OtherSpecifier()
 
 case class StaticSpecifier() extends OtherSpecifier()
 
-case class Comment(content: String) extends Statement with ExternalDef
+case class Comment(content: String) extends Statement
 
 abstract class Attribute() extends AST
 
@@ -241,7 +241,7 @@ case class AttributeSequence(attributes: List[Opt[Attribute]]) extends AST
 
 case class CompoundAttribute(inner: List[Opt[AttributeSequence]]) extends Attribute
 
-case class Declaration(declSpecs: List[Opt[Specifier]], init: List[Opt[InitDeclarator]]) extends ExternalDef with OldParameterDeclaration
+case class Declaration(declSpecs: List[Opt[Specifier]], init: List[Opt[InitDeclarator]], comment: List[String] = List()) extends ExternalDef with OldParameterDeclaration
 
 
 abstract class InitDeclarator(val declarator: Declarator, val attributes: List[Opt[AttributeSpecifier]]) extends AST {

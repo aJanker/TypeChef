@@ -355,9 +355,15 @@ object PrettyPrinter {
             case AttributeSequence(attributes) => sep(attributes, _ ~~ _)
             case CompoundAttribute(inner) => "(" ~ sep(inner, _ ~ "," ~~ _) ~ ")"
 
-            case Declaration(declSpecs, init) =>
-                sep(declSpecs, _ ~~ _) ~~ sepVaware(init, ",") ~ ";"
-
+            case Declaration(declSpecs, init, comments) =>
+                if (comments.isEmpty)
+                    sep(declSpecs, _ ~~ _) ~~ sepVaware(init, ",") ~ ";"
+                else
+                if (declSpecs.isEmpty && init.isEmpty)
+                    "/*" ~ seps(comments.map(x => Opt(FeatureExprFactory.True, x)), _ ~ "*/" * "/*" ~ _) ~ "*/"
+                else
+                    "/*" ~ seps(comments.map(x => Opt(FeatureExprFactory.True, x)), _ ~ "*/" * "/*" ~ _) ~ "*/" ~
+                        sep(declSpecs, _ ~~ _) ~~ sepVaware(init, ",") ~ ";"
             case InitDeclaratorI(declarator, lst, Some(i)) =>
                 if (!lst.isEmpty) {
                     declarator ~~ sep(lst, _ ~~ _) ~~ "=" ~~ i
@@ -502,8 +508,8 @@ object PrettyPrinter {
     sealed abstract class Doc {
         def ~~(that: Doc) = this ~ space ~ that
         def *(that: Doc) = this ~ line ~ that
-        def ~>(that: Doc) = this ~ nest(2, line ~ that)
         def ~(that: Doc) = Cons(this, that)
+        def ~>(that: Doc) = this ~ nest(2, line ~ that)
     }
 
     case class Text(s: String) extends Doc
