@@ -74,7 +74,7 @@ class CIntraAnalysisFrontendF(tunit: TranslationUnit, ts: CTypeSystemFrontend wi
 
     def deadStore(): Boolean = {
         println(fanalyze.size)
-        val err = fanalyze.par.flatMap(deadStore)
+        val err = fanalyze.flatMap(deadStore)
 
         if (err.isEmpty) {
             println("No dead stores found!")

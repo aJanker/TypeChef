@@ -12,11 +12,12 @@ import de.fosd.typechef.parser.TokenReader
 import de.fosd.typechef.parser.c.{CTypeContext, TranslationUnit, _}
 import de.fosd.typechef.typesystem._
 
-object Frontend extends EnforceTreeHelper with ASTNavigation with ConditionalNavigation {
+object Frontend extends EnforceTreeHelper with ASTNavigation with ConditionalNavigation with Logging {
 
 
     def main(args: Array[String]) {
         // load options
+
         val opt = new FrontendOptionsWithConfigFiles()
         try {
             try {
@@ -124,7 +125,7 @@ object Frontend extends EnforceTreeHelper with ASTNavigation with ConditionalNav
         stopWatch.start("lexing")
         //no parsing if read serialized ast
         val in = if (ast == null) {
-            println("#lexing")
+            logger.info("#lexing")
             lex(opt)
         } else null
 
