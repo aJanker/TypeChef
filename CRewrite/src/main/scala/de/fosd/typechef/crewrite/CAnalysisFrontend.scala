@@ -96,7 +96,10 @@ class CIntraAnalysisFrontendF(tunit: TranslationUnit, ts: CTypeSystemFrontend wi
         logger.info("Function: " + fa._1.getName + "\tAnalyse size: " + nss.size)
 
         for (s <- nss) {
-            for ((i, fi) <- df.kill(s)) {
+            logger.info("Element s:" +  s)
+            val killed = df.kill(s)
+            logger.info("df.kill: " + killed.size)
+            for ((i, fi) <- killed) {
                 val out = df.out(s)
 
                 // code such as "int a;" occurs frequently and issues an error
