@@ -100,7 +100,10 @@ class CIntraAnalysisFrontendF(tunit: TranslationUnit, ts: CTypeSystemFrontend wi
             val killed = df.kill(s)
             logger.info("df.kill: " + killed.size)
             for ((i, fi) <- killed) {
+                logger.info(i)
                 val out = df.out(s)
+                logger.info(fi)
+                logger.info(out.size)
 
                 // code such as "int a;" occurs frequently and issues an error
                 // we filter them out by checking the declaration use map for usages
