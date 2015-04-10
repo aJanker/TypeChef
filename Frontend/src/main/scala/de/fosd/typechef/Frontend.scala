@@ -131,7 +131,7 @@ object Frontend extends EnforceTreeHelper with ASTNavigation with ConditionalNav
 
 
         if (opt.parse) {
-            println("#parsing")
+            logger.info("#parsing")
             stopWatch.start("parsing")
 
             if (ast == null) {
