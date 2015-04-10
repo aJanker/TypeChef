@@ -18,7 +18,7 @@ import de.fosd.typechef.conditional.Opt
 import scala.io.Source
 
 
-sealed abstract class CAnalysisFrontend(tunit: TranslationUnit) extends CFGHelper {
+sealed abstract class CAnalysisFrontend(tunit: TranslationUnit) extends CFGHelper with Logging {
 
     protected val env = CASTEnv.createASTEnv(tunit)
     protected val fdefs = filterAllASTElems[FunctionDef](tunit)
@@ -74,25 +74,26 @@ class CIntraAnalysisFrontendF(tunit: TranslationUnit, ts: CTypeSystemFrontend wi
 
     def deadStore(): Boolean = {
         println(fanalyze.size)
-        val err = fanalyze.flatMap(deadStore)
+        val err = fanalyze.par.flatMap(deadStore)
 
         if (err.isEmpty) {
             println("No dead stores found!")
         } else {
-            println(err.map(_.toString + "\n").reduce(_ + _))
+            println(err.map(_._1.toString + "\n").reduce(_ + _))
         }
-        errors ++= err
+        errors ++= err.map(_._1)
+        errNodes ++= err
         err.isEmpty
     }
 
-    private def deadStore(fa: (FunctionDef, List[(AST, List[Opt[AST]])])): List[TypeChefError] = {
-        var err: List[TypeChefError] = List()
+    private def deadStore(fa: (FunctionDef, List[(AST, List[Opt[AST]])])): List[(TypeChefError, Opt[AST])] = {
+        var err: List[(TypeChefError, Opt[AST])] = List()
 
         val df = new Liveness(env, udm, FeatureExprFactory.empty)
 
         val nss = fa._2.map(_._1)
 
-        println("Analyse size: " +nss.size)
+        logger.info("Function: " + fa._1.getName + "\tAnalyse size: " + nss.size)
 
         for (s <- nss) {
             for ((i, fi) <- df.kill(s)) {
@@ -105,8 +106,7 @@ class CIntraAnalysisFrontendF(tunit: TranslationUnit, ts: CTypeSystemFrontend wi
                     case None => {
                         var idecls = getDecls(i)
                         if (idecls.exists(isPartOf(_, fa._1)))
-                            err ::= new TypeChefError(Severity.Warning, fi, "warning: Variable " + i.name + " is a dead store!", i, "")
-                            errNodes ::= (err.last, Opt(env.featureExpr(i), i))
+                            err ::= (new TypeChefError(Severity.Warning, fi, "warning: Variable " + i.name + " is a dead store!", i, ""), Opt(env.featureExpr(i), i))
                         }
                     case Some((x, z)) => {
                         if (! z.isTautology(fm)) {
@@ -116,8 +116,7 @@ class CIntraAnalysisFrontendF(tunit: TranslationUnit, ts: CTypeSystemFrontend wi
                                 // with isPartOf we reduce the number of false positives, since we only check local variables and function parameters.
                                 // an assignment to a global variable might be used in another function
                                 if (isPartOf(ei, fa._1) && xdecls.exists(_.eq(ei))) {
-                                    err ::= new TypeChefError(Severity.Warning, z.not(), "warning: Variable " + i.name + " is a dead store!", i, "")
-                                    errNodes ::= (err.last, Opt(env.featureExpr(i), i))
+                                    err ::= (new TypeChefError(Severity.Warning, z.not(), "warning: Variable " + i.name + " is a dead store!", i, ""), (err.last, Opt(env.featureExpr(i), i)))
                                 }
                             }
                         }
