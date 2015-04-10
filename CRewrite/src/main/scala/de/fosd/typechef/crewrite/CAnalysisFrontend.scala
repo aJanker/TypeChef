@@ -97,32 +97,30 @@ class CIntraAnalysisFrontendF(tunit: TranslationUnit, ts: CTypeSystemFrontend wi
 
         for (s <- nss) {
             logger.info("Element s:" +  s)
-            val killed = df.kill(s)
-            logger.info("df.kill: " + killed.size)
-            for ((i, fi) <- killed) {
-                logger.info(i)
-                val out = df.out(s)
-                logger.info(fi)
-                logger.info(out.size)
-
+            for ((i, fi) <- df.kill(s)) {
                 // code such as "int a;" occurs frequently and issues an error
                 // we filter them out by checking the declaration use map for usages
                 if (dum.containsKey(i) && dum.get(i).size > 0) {}
-                else out.find {case (t, _) => t == i} match {
-                    case None => {
-                        var idecls = getDecls(i)
-                        if (idecls.exists(isPartOf(_, fa._1)))
-                            err ::= (new TypeChefError(Severity.Warning, fi, "warning: Variable " + i.name + " is a dead store!", i, ""), Opt(env.featureExpr(i), i))
-                        }
-                    case Some((x, z)) => {
-                        if (! z.isTautology(fm)) {
-                            var xdecls = getDecls(x)
+                else {
+                    logger.info("Calculating path for: " + s)
+                    val out = df.out(s)
+                    logger.info("Done calculating path.")
+                    out.find {case (t, _) => t == i} match {
+                        case None => {
                             var idecls = getDecls(i)
-                            for (ei <- idecls) {
-                                // with isPartOf we reduce the number of false positives, since we only check local variables and function parameters.
-                                // an assignment to a global variable might be used in another function
-                                if (isPartOf(ei, fa._1) && xdecls.exists(_.eq(ei))) {
-                                    err ::= (new TypeChefError(Severity.Warning, z.not(), "warning: Variable " + i.name + " is a dead store!", i, ""), Opt(env.featureExpr(i), i))
+                            if (idecls.exists(isPartOf(_, fa._1)))
+                                err ::= (new TypeChefError(Severity.Warning, fi, "warning: Variable " + i.name + " is a dead store!", i, ""), Opt(env.featureExpr(i), i))
+                        }
+                        case Some((x, z)) => {
+                            if (! z.isTautology(fm)) {
+                                var xdecls = getDecls(x)
+                                var idecls = getDecls(i)
+                                for (ei <- idecls) {
+                                    // with isPartOf we reduce the number of false positives, since we only check local variables and function parameters.
+                                    // an assignment to a global variable might be used in another function
+                                    if (isPartOf(ei, fa._1) && xdecls.exists(_.eq(ei))) {
+                                        err ::= (new TypeChefError(Severity.Warning, z.not(), "warning: Variable " + i.name + " is a dead store!", i, ""), Opt(env.featureExpr(i), i))
+                                    }
                                 }
                             }
                         }
