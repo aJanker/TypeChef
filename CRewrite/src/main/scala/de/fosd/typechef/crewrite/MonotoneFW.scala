@@ -30,7 +30,7 @@ import de.fosd.typechef.conditional.Opt
 // env: ASTEnv; environment used for navigation in the AST during predecessor and
 //              successor determination
 // fm: FeatureModel; feature model used for filtering out false positives
-sealed abstract class MonotoneFW[T](env: ASTEnv, val fm: FeatureModel) extends IntraCFG with CFGHelper {
+sealed abstract class MonotoneFW[T](env: ASTEnv, val fm: FeatureModel) extends IntraCFG with CFGHelper with Logging {
 
     // dataflow, such as identifiers (type Id) may have different declarations
     // (alternative types). so we track alternative elements here using two
@@ -229,10 +229,14 @@ sealed abstract class MonotoneFW[T](env: ASTEnv, val fm: FeatureModel) extends I
     def out(a: AST) = {
         val o = outfunction(a)
 
+        logger.info("start res in func out for: " + a.toString)
         val res: List[(T, FeatureExpr)] = o.toList.map { x => (getOriginal(x._1), x._2) }
+        logger.info("finish res in func out for: " + a.toString)
+
 
         // joining values from different paths can lead to duplicates.
         // remove them and filter out values from unsatisfiable paths.
+        logger.info("start remove duplicates...")
         res.distinct.filter { case (_, fexp) => fexp.isSatisfiable(fm) }
     }
 
