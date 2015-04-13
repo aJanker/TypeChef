@@ -333,6 +333,7 @@ trait IntraCFG extends ASTNavigation with ConditionalNavigation {
         succCCFGCache.lookup(source) match {
             case Some(v) => v
             case None => {
+                println("searching succ for: " + source)
                 var newres: CFGRes = List()
                 val ctx = env.featureExpr(source)
 

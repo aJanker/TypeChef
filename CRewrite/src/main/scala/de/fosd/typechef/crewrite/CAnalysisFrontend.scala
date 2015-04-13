@@ -96,7 +96,7 @@ class CIntraAnalysisFrontendF(tunit: TranslationUnit, ts: CTypeSystemFrontend wi
         logger.info("Function: " + fa._1.getName + "\tAnalyse size: " + nss.size)
 
         for (s <- nss) {
-            logger.info("Element s:" +  s)
+            logger.info("Element s: " +  s)
             for ((i, fi) <- df.kill(s)) {
                 // code such as "int a;" occurs frequently and issues an error
                 // we filter them out by checking the declaration use map for usages

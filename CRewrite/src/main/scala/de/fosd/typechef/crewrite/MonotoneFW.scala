@@ -207,6 +207,7 @@ sealed abstract class MonotoneFW[T](env: ASTEnv, val fm: FeatureModel) extends I
         circular[AST, L](b) {
             case _: E => i
             case a =>
+                println("element a: " + a)
                 val fl = F(a)
                 fl.foldLeft[L](b)((r: L, s: Opt[AST]) => combinationOperator(r, updateFeatureExprOfMonotoneElements(point(s.entry), s.condition)))
         }
