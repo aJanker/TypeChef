@@ -230,6 +230,7 @@ sealed abstract class MonotoneFW[T](env: ASTEnv, val fm: FeatureModel) extends I
         val o = outfunction(a)
 
         logger.info("start res in func out for: " + a.toString)
+        logger.info("size: " +  o.size)
         val res: List[(T, FeatureExpr)] = o.toList.map { x => (getOriginal(x._1), x._2) }
         logger.info("finish res in func out for: " + a.toString)
 
@@ -237,7 +238,9 @@ sealed abstract class MonotoneFW[T](env: ASTEnv, val fm: FeatureModel) extends I
         // joining values from different paths can lead to duplicates.
         // remove them and filter out values from unsatisfiable paths.
         logger.info("start remove duplicates...")
-        res.distinct.filter { case (_, fexp) => fexp.isSatisfiable(fm) }
+        val resUnique : List[(T, FeatureExpr)] = res.distinct
+        logger.info("unique elements: " + resUnique.size)
+        resUnique.filter { case (_, fexp) => fexp.isSatisfiable(fm) }
     }
 
     protected def infunction(a: AST): L
