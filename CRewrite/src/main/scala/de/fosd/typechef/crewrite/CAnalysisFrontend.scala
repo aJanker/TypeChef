@@ -92,7 +92,6 @@ class CIntraAnalysisFrontendF(tunit: TranslationUnit, ts: CTypeSystemFrontend wi
 
         val nss = fa._2.map(_._1)
 
-        println("Analyse size: " +nss.size)
 
         for (s <- nss) {
             for ((i, fi) <- df.kill(s)) {
@@ -335,7 +334,6 @@ class CIntraAnalysisFrontendF(tunit: TranslationUnit, ts: CTypeSystemFrontend wi
     }
 
     def caseTermination(): Boolean = {
-        println(fanalyze.size)
         val err = fanalyze.flatMap(caseTermination)
 
         if (err.isEmpty) {
@@ -350,7 +348,7 @@ class CIntraAnalysisFrontendF(tunit: TranslationUnit, ts: CTypeSystemFrontend wi
 
     private def caseTermination(fa: (FunctionDef, List[(AST, List[Opt[AST]])])): List[TypeChefError] = {
         val casestmts = filterAllASTElems[CaseStatement](fa._1)
-        println(casestmts.size)
+
         val ct = new CaseTermination(env)
 
         casestmts.filterNot(ct.isTerminating).map {
