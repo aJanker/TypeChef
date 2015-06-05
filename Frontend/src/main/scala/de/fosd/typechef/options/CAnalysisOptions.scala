@@ -39,7 +39,7 @@ class CAnalysisOptions extends FeatureModelOptions with ICTypeSysOptions with IC
 
 
     val opts: List[SecurityOption] = List(
-        Apointersign, Aintegeroverflow, Aimplicitcoercion, Alongdesignator, Aimplicitidentifier, Aconflictinglinkage, Avolatile, Aconst, Achar, Sdoublefree, Sxfree, Sunitializedmemory, Scasetermination, Sdanglingswitchcode, Scfginnonvoidfunc, Sstdlibfuncreturn, Sdeadstore
+        Apointersign, Aintegeroverflow, Aimplicitcoercion, Alongdesignator, Aimplicitidentifier, Aconflictinglinkage, Avolatile, Aconst, Achar, Sdoublefree, Sxfree, Sunitializedmemory, Scasetermination, Sdanglingswitchcode, Scfginnonvoidfunc, Sstdlibfuncreturn, Sdeadstore, Sinteractiondegree
     )
 
 
