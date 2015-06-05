@@ -1,6 +1,5 @@
 package de.fosd.typechef.options;
 
-import de.fosd.typechef.VALexer;
 import de.fosd.typechef.error.Position;
 import de.fosd.typechef.featureexpr.FeatureExpr;
 import de.fosd.typechef.featureexpr.FeatureExprFactory$;
@@ -11,15 +10,12 @@ import gnu.getopt.LongOpt;
 import scala.Function3;
 
 import java.io.File;
-import java.util.ArrayList;
 import java.util.List;
 
 
 public class FrontendOptions extends CAnalysisOptions implements ParserOptions {
     public boolean parse = true,
             typecheck = false,
-            ifdeftoif = false,
-            decluse = false,
             writeInterface = false,
             dumpcfg = false,
             serializeAST = false,
@@ -31,11 +27,15 @@ public class FrontendOptions extends CAnalysisOptions implements ParserOptions {
             simplifyPresenceConditions = false,
             writePI = false,
             printInclude = false,
-            printVersion = false;
+            printVersion = false,
+            defaultPC = true;
+
     protected File errorXMLFile = null;
     private final File _autoErrorXMLFile = new File(".");
     String outputStem = "";
     private String filePresenceConditionFile = "";
+    private File simplifyFM = null;
+
 
 
     private final static char F_PARSE = Options.genOptionId();
@@ -55,6 +55,8 @@ public class FrontendOptions extends CAnalysisOptions implements ParserOptions {
     private static final char TY_DEBUG_INCLUDES = genOptionId();
     private static final char TY_VERSION = genOptionId();
     private static final char TY_HELP = genOptionId();
+    private final static char F_DISABLEPC = Options.genOptionId();
+    private final static char F_SIMPLIFYFM = Options.genOptionId();
     private Function3<FeatureExpr, String, Position, Object> _renderParserError;
 
 
@@ -94,7 +96,11 @@ public class FrontendOptions extends CAnalysisOptions implements ParserOptions {
                         "Presence condition for the file (format like --featureModelFExpr). Default 'file.pc'."),
                 new Option("bdd", LongOpt.NO_ARGUMENT, F_BDD, null,
                         "Use BDD engine instead of SAT engine (provide as first parameter)."),
-
+                new Option("disablePC", LongOpt.NO_ARGUMENT, F_DISABLEPC, null,
+                        "Disable default parsing of present *.pc files."),
+                new Option("simplifyFM", LongOpt.REQUIRED_ARGUMENT, F_SIMPLIFYFM, null,
+                        "Use an additional feature model or extracted configuration presence condition for an more" +
+                                " efficient interaction degree calculation"),
                 new Option("errorXML", LongOpt.OPTIONAL_ARGUMENT, F_ERRORXML, "file",
                         "File to store syntax and type errors in XML format.")
 
@@ -172,6 +178,11 @@ public class FrontendOptions extends CAnalysisOptions implements ParserOptions {
         } else if (c == TY_HELP) {//--help
             printUsage();
             printVersion = true;
+        } else if (c == F_DISABLEPC) {
+            defaultPC = false;
+        } else if (c == F_SIMPLIFYFM) {
+            checkFileExists(g.getOptarg());
+            simplifyFM = new File(g.getOptarg());
         } else
             return super.interpretOption(c, g);
 
@@ -240,6 +251,10 @@ public class FrontendOptions extends CAnalysisOptions implements ParserOptions {
         return localFM;
     }
 
+    public File getSimplifyFM() {
+        return simplifyFM;
+    }
+
     public String getSerializedASTFilename() {
         return outputStem + ".ast";
     }
@@ -254,6 +269,18 @@ public class FrontendOptions extends CAnalysisOptions implements ParserOptions {
 
     public boolean printParserStatistics() {
         return parserStatistics;
+    }
+
+    public String getStmtInteractionDegreeFilename() {
+        return outputStem + ".stmt.degree";
+    }
+
+    public String getWarningStmtInteractionDegreeFilename() {
+        return outputStem + ".stmt.warn.degree";
+    }
+
+    public String getErrorStmtInteractionDegreeFilename() {
+        return outputStem + ".stmt.error.degree";
     }
 
     @Override

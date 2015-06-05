@@ -1,16 +1,14 @@
 package de.fosd.typechef
 
 
-import de.fosd.typechef.parser.c._
-import de.fosd.typechef.typesystem._
-import de.fosd.typechef.crewrite._
 import java.io._
-import parser.TokenReader
-import de.fosd.typechef.options.{FrontendOptionsWithConfigFiles, FrontendOptions, OptionException}
-import de.fosd.typechef.parser.c.CTypeContext
-import de.fosd.typechef.parser.c.TranslationUnit
-import de.fosd.typechef.featureexpr.FeatureExpr
 import java.util.zip.{GZIPInputStream, GZIPOutputStream}
+
+import de.fosd.typechef.crewrite._
+import de.fosd.typechef.options.{FrontendOptions, FrontendOptionsWithConfigFiles, OptionException}
+import de.fosd.typechef.parser.TokenReader
+import de.fosd.typechef.parser.c.{CTypeContext, TranslationUnit, _}
+import de.fosd.typechef.typesystem._
 
 object Frontend extends EnforceTreeHelper {
 
@@ -223,6 +221,22 @@ object Frontend extends EnforceTreeHelper {
                     if (opt.warning_dead_store) {
                         stopWatch.start("deadstore")
                         sa.deadStore()
+                    }
+
+                    if (opt.interaction_degree) {
+                        println("#calculate degrees")
+                        stopWatch.start("interactiondegree")
+                        val degrees = sa.getInteractionDegrees(opt.getSimplifyFM)
+
+                        //write interaction degress
+                        val stmtWriter = new FileWriter(new File(opt.getStmtInteractionDegreeFilename))
+                        val warningWriter = new FileWriter(new File(opt.getWarningStmtInteractionDegreeFilename))
+                        val errorWriter = new FileWriter(new File(opt.getErrorStmtInteractionDegreeFilename))
+                        sa.writeStatementDegrees(degrees._1, stmtWriter)
+                        sa.writeWarningDegrees(degrees._2, warningWriter)
+                        sa.writeErrorDegrees(degrees._3, errorWriter)
+                        stmtWriter.close()
+                        errorWriter.close()
                     }
                 }
 

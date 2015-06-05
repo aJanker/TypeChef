@@ -8,7 +8,7 @@ trait ICAnalysisOptions {
 
     // for convenience: group all dataflow analyses
     def staticanalyses = {
-        typechecksa || warning_case_termination || warning_dangling_switch_code
+        typechecksa || warning_case_termination || warning_dangling_switch_code || interaction_degree
     }
 
     // for convenience: groups all dataflow analyses that need typechecking information!
@@ -61,6 +61,9 @@ trait ICAnalysisOptions {
     // -A deadstore
     // see: http://en.wikipedia.org/wiki/Dead_store and "clang -cc1 -analyze -analyzer-checker-help"
     def warning_dead_store = false
+
+    // -A interactiondegree
+    def interaction_degree = false
 }
 
 trait CAnalysisOptionProvider {

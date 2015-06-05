@@ -1,11 +1,11 @@
 package de.fosd.typechef.featureexpr.bdd
 
 import de.fosd.typechef.featureexpr._
-import bdd.FExprBuilder._
+import de.fosd.typechef.featureexpr.bdd.FExprBuilder._
 import net.sf.javabdd._
-import collection.mutable.{WeakHashMap, Map}
-import de.fosd.typechef.featureexpr._
-import annotation.tailrec
+
+import scala.annotation.tailrec
+import scala.collection.mutable.{Map, WeakHashMap}
 
 
 object FeatureExprHelper {
@@ -30,6 +30,8 @@ object FeatureExprHelper {
 class BDDFeatureExpr(private[featureexpr] val bdd: BDD) extends FeatureExpr {
 
     import CastHelper._
+
+    def leak() = bdd
 
     def or(that: FeatureExpr): FeatureExpr = {
         if (that == FeatureExprFactory.True) FeatureExprFactory.True
