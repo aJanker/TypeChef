@@ -1,20 +1,17 @@
 
 package de.fosd.typechef.crewrite
 
-import de.fosd.typechef.featureexpr._
-import java.io.{Writer, FileWriter, StringWriter}
-import de.fosd.typechef.featureexpr.bdd.BDDFeatureExpr
-import de.fosd.typechef.parser.c._
-import de.fosd.typechef.typesystem._
-import de.fosd.typechef.error.{Severity, TypeChefError}
-import de.fosd.typechef.parser.c.SwitchStatement
-import org.apache.tools.ant.util.StringUtils
-import scala.collection.JavaConversions._
+import java.io.{StringWriter, Writer}
 import java.util
-import de.fosd.typechef.parser.c.FunctionDef
-import de.fosd.typechef.parser.c.TranslationUnit
-import de.fosd.typechef.conditional.Opt
 
+import de.fosd.typechef.conditional.Opt
+import de.fosd.typechef.error.{Severity, TypeChefError}
+import de.fosd.typechef.featureexpr._
+import de.fosd.typechef.featureexpr.bdd.BDDFeatureExpr
+import de.fosd.typechef.parser.c.{FunctionDef, SwitchStatement, TranslationUnit, _}
+import de.fosd.typechef.typesystem._
+
+import scala.collection.JavaConversions._
 import scala.io.Source
 
 
@@ -103,10 +100,11 @@ class CIntraAnalysisFrontendF(tunit: TranslationUnit, ts: CTypeSystemFrontend wi
                 else out.find {case (t, _) => t == i} match {
                     case None => {
                         var idecls = getDecls(i)
-                        if (idecls.exists(isPartOf(_, fa._1)))
+                        if (idecls.exists(isPartOf(_, fa._1))) {
                             err ::= new TypeChefError(Severity.Warning, fi, "warning: Variable " + i.name + " is a dead store!", i, "")
                             errNodes ::= (err.last, Opt(env.featureExpr(i), i))
                         }
+                    }
                     case Some((x, z)) => {
                         if (! z.isTautology(fm)) {
                             var xdecls = getDecls(x)
