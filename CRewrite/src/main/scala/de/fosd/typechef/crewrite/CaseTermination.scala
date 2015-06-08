@@ -1,7 +1,7 @@
 package de.fosd.typechef.crewrite
 
-import de.fosd.typechef.parser.c._
 import de.fosd.typechef.conditional.Opt
+import de.fosd.typechef.parser.c._
 
 // implements a simple analysis that checks whether a case statement associated with a statement
 // terminates under all conditions with a break statement
@@ -47,7 +47,7 @@ class CaseTermination(env: ASTEnv) extends IntraCFG {
             }
             if (wlist.size > 25000) {
                 println("Error - hit endless recursion for " +  curelem + " in " + curelem.entry.getPositionFrom)
-                // return false;
+                return false;
             }
         }
 
