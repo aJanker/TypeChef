@@ -1,11 +1,10 @@
 package de.fosd.typechef.crewrite
 
-import org.kiama.rewriting.Rewriter._
-
+import de.fosd.typechef.conditional.Opt
 import de.fosd.typechef.featureexpr.{FeatureExprFactory, FeatureModel}
 import de.fosd.typechef.parser.c._
 import de.fosd.typechef.typesystem._
-import de.fosd.typechef.conditional.Opt
+import org.kiama.rewriting.Rewriter._
 
 // https://www.securecoding.cert.org/confluence/display/seccode/ERR33-C.+Detect+and+handle+standard+library+errors
 // ERR33-C
@@ -26,7 +25,7 @@ import de.fosd.typechef.conditional.Opt
 // i  = ??
 // E  = {FunctionDef} // see MonotoneFW
 // F  = ??
-sealed abstract class StdLibFuncReturn(env: ASTEnv, dum: DeclUseMap, udm: UseDeclMap, fm: FeatureModel) extends MonotoneFWIdLab(env, dum, udm, fm) with UsedDefinedDeclaredVariables {
+sealed abstract class StdLibFuncReturn(f: FunctionDef, env: ASTEnv, dum: DeclUseMap, udm: UseDeclMap, fm: FeatureModel) extends MonotoneFWIdLab(f, env, dum, udm, fm) with UsedDefinedDeclaredVariables {
     // list of standard library functions and their possible error returns
     // taken from above website
     val function: List[String]
@@ -137,11 +136,15 @@ sealed abstract class StdLibFuncReturn(env: ASTEnv, dum: DeclUseMap, udm: UseDec
     protected def b = l
     protected def combinationOperator(l1: L, l2: L) = union(l1, l2)
 
+    /*
     protected def infunction(a: AST): L = combinator(a)
-    protected def outfunction(a: AST): L = f_l(a)
+    protected def outfunction(a: AST): L = f_l(a) */
+
+    protected def isForward = true
+
 }
 
-class StdLibFuncReturn_Null(env: ASTEnv, dum: UseDeclMap, udm: UseDeclMap, fm: FeatureModel) extends StdLibFuncReturn(env, dum, udm, fm) {
+class StdLibFuncReturn_Null(f: FunctionDef, env: ASTEnv, dum: UseDeclMap, udm: UseDeclMap, fm: FeatureModel) extends StdLibFuncReturn(f, env, dum, udm, fm) {
 
     val function: List[String] = List(
         "aligned_alloc",
@@ -182,9 +185,11 @@ class StdLibFuncReturn_Null(env: ASTEnv, dum: UseDeclMap, udm: UseDeclMap, fm: F
         // ((void*)0)
         CastExpr(TypeName(List(Opt(FeatureExprFactory.True, VoidSpecifier())),
             Some(AtomicAbstractDeclarator(List(Opt(FeatureExprFactory.True, Pointer(List()))),List()))),Constant("0")))
+
+    solve()
 }
 
-class StdLibFuncReturn_EOF(env: ASTEnv, dum: DeclUseMap, udm: UseDeclMap, fm: FeatureModel) extends StdLibFuncReturn(env, dum, udm, fm) {
+class StdLibFuncReturn_EOF(f: FunctionDef, env: ASTEnv, dum: DeclUseMap, udm: UseDeclMap, fm: FeatureModel) extends StdLibFuncReturn(f, env, dum, udm, fm) {
 
     val function: List[String] = List(
         "fclose",
@@ -224,5 +229,7 @@ class StdLibFuncReturn_EOF(env: ASTEnv, dum: DeclUseMap, udm: UseDeclMap, fm: Fe
     )
 
     val errorreturn = List(Constant("-1")) // EOF, EOF (negative)
+
+    solve()
 }
 

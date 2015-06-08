@@ -85,7 +85,7 @@ class CIntraAnalysisFrontend(tunit: TranslationUnit, ts: CTypeSystemFrontend wit
     private def deadStore(fa: (FunctionDef, List[(AST, List[Opt[AST]])])): List[TypeChefError] = {
         var err: List[TypeChefError] = List()
 
-        val df = new Liveness(env, udm, FeatureExprFactory.empty)
+        val df = new Liveness(env, udm, FeatureExprFactory.empty, fa._1)
 
         val nss = fa._2.map(_._1)
 
@@ -150,7 +150,7 @@ class CIntraAnalysisFrontend(tunit: TranslationUnit, ts: CTypeSystemFrontend wit
     private def doubleFree(fa: (FunctionDef, List[(AST, List[Opt[AST]])]), casestudy: String): List[TypeChefError] = {
         var err: List[TypeChefError] = List()
 
-        val df = new DoubleFree(env, dum, udm, FeatureExprFactory.empty, casestudy)
+        val df = new DoubleFree(fa._1, env, dum, udm, FeatureExprFactory.empty, casestudy)
 
         val nss = fa._2.map(_._1).filterNot(x => x.isInstanceOf[FunctionDef])
 
@@ -194,7 +194,7 @@ class CIntraAnalysisFrontend(tunit: TranslationUnit, ts: CTypeSystemFrontend wit
     private def uninitializedMemory(fa: (FunctionDef, List[(AST, List[Opt[AST]])])): List[TypeChefError] = {
         var err: List[TypeChefError] = List()
 
-        val um = new UninitializedMemory(env, dum, udm, FeatureExprFactory.empty)
+        val um = new UninitializedMemory(fa._1, env, dum, udm, FeatureExprFactory.empty)
         val nss = fa._2.map(_._1).filterNot(x => x.isInstanceOf[FunctionDef])
 
         for (s <- nss) {
@@ -238,7 +238,7 @@ class CIntraAnalysisFrontend(tunit: TranslationUnit, ts: CTypeSystemFrontend wit
     private def xfree(fa: (FunctionDef, List[(AST, List[Opt[AST]])])): List[TypeChefError] = {
         var err: List[TypeChefError] = List()
 
-        val xf = new XFree(env, dum, udm, FeatureExprFactory.empty, "")
+        val xf = new XFree(fa._1, env, dum, udm, FeatureExprFactory.empty, "")
         val nss = fa._2.map(_._1).filterNot(x => x.isInstanceOf[FunctionDef])
 
         for (s <- nss) {
@@ -356,7 +356,7 @@ class CIntraAnalysisFrontend(tunit: TranslationUnit, ts: CTypeSystemFrontend wit
         val cl: List[StdLibFuncReturn] = List(
             //new StdLibFuncReturn_EOF(env, dum, udm, fm),
 
-            new StdLibFuncReturn_Null(env, dum, udm, FeatureExprFactory.empty)
+            new StdLibFuncReturn_Null(fa._1, env, dum, udm, FeatureExprFactory.empty)
         )
 
         for ((s, _) <- fa._2) {

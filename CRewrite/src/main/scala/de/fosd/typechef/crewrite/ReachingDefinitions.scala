@@ -1,10 +1,9 @@
 package de.fosd.typechef.crewrite
 
-import org.kiama.rewriting.Rewriter._
-
+import de.fosd.typechef.featureexpr.FeatureModel
 import de.fosd.typechef.parser.c._
 import de.fosd.typechef.typesystem.{DeclUseMap, UseDeclMap}
-import de.fosd.typechef.featureexpr.FeatureModel
+import org.kiama.rewriting.Rewriter._
 
 // implements reaching definitions (rd) dataflow analysis
 // see http://en.wikipedia.org/wiki/Reaching_definition
@@ -26,7 +25,7 @@ import de.fosd.typechef.featureexpr.FeatureModel
 //     so the analysis will likely produce a lot
 //     of false positives, because memory can be initialized
 //     in a different function
-class ReachingDefinitions(env: ASTEnv, dum: DeclUseMap, udm: UseDeclMap, fm: FeatureModel, f: FunctionDef) extends MonotoneFWIdLab(env, null, null, fm) with IntraCFG with CFGHelper with ASTNavigation with UsedDefinedDeclaredVariables {
+class ReachingDefinitions(env: ASTEnv, dum: DeclUseMap, udm: UseDeclMap, fm: FeatureModel, f: FunctionDef) extends MonotoneFWIdLab(f, env, null, null, fm) with IntraCFG with CFGHelper with ASTNavigation with UsedDefinedDeclaredVariables {
 
     // we store all elements that can be created with gen and kill
     // in a cache, so that we pass each time the same object to the monotonefw
@@ -111,6 +110,11 @@ class ReachingDefinitions(env: ASTEnv, dum: DeclUseMap, udm: UseDeclMap, fm: Fea
 
     //  in(a) = for p in pred(a) r = r + out(p)
     // out(a) = gen(a) + (in(a) - kill(a))
+    /*
     protected def infunction(a: AST): L = combinator(a)
-    protected def outfunction(a: AST): L = f_l(a)
+    protected def outfunction(a: AST): L = f_l(a) */
+
+    protected def isForward = true
+
+    solve()
 }

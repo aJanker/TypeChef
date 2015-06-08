@@ -1,10 +1,9 @@
 package de.fosd.typechef.crewrite
 
-import org.kiama.rewriting.Rewriter._
-
+import de.fosd.typechef.featureexpr.FeatureModel
 import de.fosd.typechef.parser.c._
 import de.fosd.typechef.typesystem.{DeclUseMap, UseDeclMap}
-import de.fosd.typechef.featureexpr.FeatureModel
+import org.kiama.rewriting.Rewriter._
 
 // implements a simple analysis of freeing memory that was not dynamically allocated
 // https://www.securecoding.cert.org/confluence/display/seccode/MEM34-C.+Only+free+memory+allocated+dynamically
@@ -22,7 +21,7 @@ import de.fosd.typechef.featureexpr.FeatureModel
 // i  = ∅            // should be {(x,?)|x ∈ FV(S*)}
 // E  = {FunctionDef} // see MonotoneFW
 // F  = flow
-class XFree(env: ASTEnv, dum: DeclUseMap, udm: UseDeclMap, fm: FeatureModel, casestudy: String) extends MonotoneFWIdLab(env, dum, udm, fm) with IntraCFG with CFGHelper with ASTNavigation with UsedDefinedDeclaredVariables {
+class XFree(f: FunctionDef, env: ASTEnv, dum: DeclUseMap, udm: UseDeclMap, fm: FeatureModel, casestudy: String) extends MonotoneFWIdLab(f, env, dum, udm, fm) with IntraCFG with CFGHelper with ASTNavigation with UsedDefinedDeclaredVariables {
 
     private val freecalls = {
         if (casestudy == "linux") List("free", "kfree")
@@ -167,6 +166,11 @@ class XFree(env: ASTEnv, dum: DeclUseMap, udm: UseDeclMap, fm: FeatureModel, cas
     protected def b = l
     protected def combinationOperator(l1: L, l2: L) = union(l1, l2)
 
+    /*
     protected def infunction(a: AST): L = f_l(a)
-    protected def outfunction(a: AST): L = combinator(a)
+    protected def outfunction(a: AST): L = combinator(a) */
+
+    protected def isForward = true
+
+    solve()
 }
