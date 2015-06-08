@@ -13,7 +13,7 @@ trait ICAnalysisOptions {
 
     // for convenience: groups all dataflow analyses that need typechecking information!
     def typechecksa = {
-        warning_double_free || warning_xfree || warning_uninitialized_memory || warning_cfg_in_non_void_func || warning_stdlib_func_return || warning_dead_store
+        warning_double_free || warning_xfree || warning_uninitialized_memory || warning_cfg_in_non_void_func || warning_stdlib_func_return || warning_dead_store || interaction_degree
     }
 
 
