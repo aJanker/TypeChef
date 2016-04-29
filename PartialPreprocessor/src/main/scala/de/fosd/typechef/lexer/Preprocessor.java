@@ -155,6 +155,7 @@ public class Preprocessor extends DebuggingPreprocessor implements Closeable, VA
     PreprocessorListener listener;
 
     private List<MacroConstraint> macroConstraints = new ArrayList<MacroConstraint>();
+    private Map<String, FeatureExpr> includedPragmaOnceFiles;
 
     public Preprocessor(MacroFilter macroFilter, FeatureModel fm) {
         this.featureModel = fm;
@@ -176,6 +177,7 @@ public class Preprocessor extends DebuggingPreprocessor implements Closeable, VA
         this.warnings = EnumSet.noneOf(Warning.class);
         this.filesystem = new JavaFileSystem();
         this.listener = null;
+        this.includedPragmaOnceFiles = new HashMap<String, FeatureExpr>();
     }
 
     public Preprocessor() {
@@ -316,7 +318,7 @@ public class Preprocessor extends DebuggingPreprocessor implements Closeable, VA
 
     protected void error(int line, int column, String msg)
             throws LexerException {
-        error(line,column, msg, null);
+        error(line, column, msg, null);
     }
     /**
      * Handles an error.
@@ -327,11 +329,11 @@ public class Preprocessor extends DebuggingPreprocessor implements Closeable, VA
     protected void error(int line, int column, String msg, FeatureExpr pc)
             throws LexerException {
 
-        if (pc ==null)
-            pc =  state.getFullPresenceCondition();
+        if (pc == null)
+            pc = state.getFullPresenceCondition();
         if (listener != null)
             listener.handleError(sourceManager.getSource().getName(), line, column, msg,
-                   pc);
+                    pc);
         else
             throw new LexerException("Error at " + line + ":" + column + ": "
                     + msg, pc);
@@ -355,9 +357,11 @@ public class Preprocessor extends DebuggingPreprocessor implements Closeable, VA
      * If a PreprocessorListener is installed, it receives the warning.
      * Otherwise, an exception is thrown.
      */
-    protected void warning(int line, int column, String msg)
+    protected void warning(int line, int column, String msg, FeatureExpr fexpr)
             throws LexerException {
-        FeatureExpr fexpr =  state.getFullPresenceCondition();
+        if (fexpr == null)
+            fexpr = FeatureExprLib.True();
+        fexpr = fexpr.and(state.getFullPresenceCondition());
         if (warnings.contains(Warning.ERROR))
             error(line, column, msg);
         else if (listener != null)
@@ -377,7 +381,11 @@ public class Preprocessor extends DebuggingPreprocessor implements Closeable, VA
      * @see #warning(int, int, String)
      */
     protected void warning(Token tok, String msg) throws LexerException {
-        warning(tok.getLine(), tok.getColumn(), msg);
+        warning(tok, msg, null);
+    }
+
+    protected void warning(Token tok, String msg, FeatureExpr fexpr) throws LexerException {
+        warning(tok.getLine(), tok.getColumn(), msg, fexpr);
     }
 
     /**
@@ -399,8 +407,11 @@ public class Preprocessor extends DebuggingPreprocessor implements Closeable, VA
         if ("defined".equals(name))
             throw new LexerException("Cannot redefine name 'defined'", state
                     .getFullPresenceCondition());
+        if (this.getSource() != null)
+            logAddMacro(name, feature, m, this.getSource());
         macros = macros.define(name, feature, m);
     }
+
 
     public void removeMacro(String name, FeatureExpr feature) {
         macros = macros.undefine(name, feature);
@@ -896,7 +907,7 @@ public class Preprocessor extends DebuggingPreprocessor implements Closeable, VA
                 }
             } catch (ParseParamException e) {
                 e.printStackTrace();
-                warning(e.tok, e.errorMsg);
+                warning(e.tok, e.errorMsg, null);
                 return false;
             }
         }
@@ -1111,7 +1122,7 @@ public class Preprocessor extends DebuggingPreprocessor implements Closeable, VA
                     + " has " + expansion.getArgCount()
                     + " parameters (variadic: " + expansion.isVariadic() + ") for expansion under condition "
                     + macroExpansion.getFeature() + " but given " + args.size()
-                    + " args");
+                    + " args", macroExpansion.getFeature());
             return args;
         } else {
             return args;
@@ -1232,7 +1243,7 @@ public class Preprocessor extends DebuggingPreprocessor implements Closeable, VA
             warning(origInvokeTok,
                     "inline expansion of macro " + macroName
                             + " is not exaustive. assuming 0 for "
-                            + commonCondition.not());
+                            + commonCondition.not(), commonCondition.not());
             resultList.add(new UnnumberedUnexpandingTokenStreamSource(
                     Collections.singletonList(OutputHelper.zero())));
         }
@@ -1522,7 +1533,22 @@ public class Preprocessor extends DebuggingPreprocessor implements Closeable, VA
             return false;
         if (getFeature(Feature.DEBUG_VERBOSE))
             System.err.println("pp: including " + file);
-        sourceManager.push_source(file.getSource(), true);
+
+        if (this.includedPragmaOnceFiles.containsKey(file.getPath())) {
+            // This file has already been included once with the preprocessor directive #pragma once
+            // We include the file only if we have NOT already included the file under a condition
+            // which contains also the current condition
+            FeatureExpr condition = this.includedPragmaOnceFiles.get(file.getPath());
+            FeatureExpr currentCondition = this.state.getFullPresenceCondition();
+
+            if (currentCondition.andNot(condition).isSatisfiable())
+                sourceManager.push_source(file.getSource(), true);
+
+        } else {
+            sourceManager.push_source(file.getSource(), true);
+        }
+
+
         return true;
     }
 
@@ -1588,9 +1614,9 @@ public class Preprocessor extends DebuggingPreprocessor implements Closeable, VA
 
     private Token parse_include(boolean next) throws IOException,
             LexerException {
-        LexerSource lexer = (LexerSource) sourceManager.getSource();
+        LexerSource lexerSource = (LexerSource) sourceManager.getSource();
         try {
-            lexer.setInclude(true);
+            lexerSource.setInclude(true);
             processing_include = true;
             Token tok = getNextNonwhiteToken();
 
@@ -1602,7 +1628,7 @@ public class Preprocessor extends DebuggingPreprocessor implements Closeable, VA
                 /*
                      * XXX Use the original text, not the value. Backslashes must
                      * not be treated as escapes here.
-                     * PG: the above is no more needed, because the lexer does
+                     * PG: the above is no more needed, because the lexerSource does
                      * not handle backslashes as escapes when processing includes.
                      */
                 buf.append((String) tok.getValue());
@@ -1623,7 +1649,7 @@ public class Preprocessor extends DebuggingPreprocessor implements Closeable, VA
                         case EOF:
                             break HEADER;
                         default:
-                            warning(tok, "Unexpected token on #" + "include line");
+                            warning(tok, "Unexpected token on #" + "include line", null);
                             return source_skipline(false);
                     }
                 }
@@ -1673,7 +1699,7 @@ public class Preprocessor extends DebuggingPreprocessor implements Closeable, VA
             name = buf.toString();
             processing_include = false;
             /* Do the inclusion. */
-            include(sourceManager.getSource().getPath(), tok.getLine(), name,
+            include(lexerSource.getPath(), tok.getLine(), name,
                     quoted, next);
 
             /*
@@ -1686,15 +1712,27 @@ public class Preprocessor extends DebuggingPreprocessor implements Closeable, VA
             return tok;
         } finally {
             processing_include = false;
-            lexer.setInclude(false);
+            lexerSource.setInclude(false);
         }
     }
 
     protected void pragma(Token nameTok, List<Token> value) throws IOException,
             LexerException {
         String pragmaName = nameTok.getText();
-        if (!"pack".equals(pragmaName))
+
+        // found directive #pragma once -> add the current file with the current condition to a map containing all headers
+        // already included with the directive #pragma once to avoid duplicate header inclusion
+        if (pragmaName.equalsIgnoreCase("once"))
+            updateIncludedPragmaOnceFiles(sourceManager.getSource().getPath(), this.state.getFullPresenceCondition());
+        else if (!"pack".equals(pragmaName))
             warning(nameTok, "Unknown #" + "pragma: " + pragmaName);
+    }
+
+    private void updateIncludedPragmaOnceFiles(String path, FeatureExpr condition) {
+        if (this.includedPragmaOnceFiles.containsKey(path))
+            this.includedPragmaOnceFiles.put(path, condition.or(this.includedPragmaOnceFiles.get(path)));
+        else
+            this.includedPragmaOnceFiles.put(path, condition);
     }
 
     private Token parse_pragma() throws IOException, LexerException {

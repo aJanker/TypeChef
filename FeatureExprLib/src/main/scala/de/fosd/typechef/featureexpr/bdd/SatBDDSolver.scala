@@ -26,7 +26,7 @@ object SatSolver {
      */
     def getSatisfiableAssignmentFromStringSets(fm: BDDFeatureModel, interestingFeatures: Set[SingleFeatureExpr],
                                                defEnabledFeatures: Set[String], defDisabledFeatures: Set[String],
-                                               preferDisabledFeatures: Boolean): Option[Pair[List[SingleFeatureExpr], List[SingleFeatureExpr]]] = {
+                                               preferDisabledFeatures: Boolean): Option[(List[SingleFeatureExpr], List[SingleFeatureExpr])] = {
         val bddDNF = Set(
             (defEnabledFeatures.map(fm.variables(_)) ++ defDisabledFeatures.map(-fm.variables(_)))
                 .toSeq).iterator
@@ -37,7 +37,7 @@ object SatSolver {
         // the result will only contain interesting features. Even parts of this expression will be omitted if uninteresting.
         var remainingInterestingFeatures = interestingFeatures
         assignment match {
-            case Some(Pair(trueFeatures, falseFeatures)) => {
+            case Some((trueFeatures, falseFeatures)) => {
 
                 if (preferDisabledFeatures) {
                     var enabledFeatures: Set[SingleFeatureExpr] = Set()
@@ -94,7 +94,7 @@ object SatSolver {
      * The return value is a Pair where the first element is a list of the feature names set to true.
      * The second element is a list of feature names set to false.
      */
-    def getSatAssignment(featureModel: BDDFeatureModel, dnf: Iterator[Seq[Int]], lookupName: (Int) => String): Option[Pair[List[String], List[String]]] = {
+    def getSatAssignment(featureModel: BDDFeatureModel, dnf: Iterator[Seq[Int]], lookupName: (Int) => String): Option[(List[String], List[String])] = {
         val solver =
             (if (CACHING && (nfm(featureModel) != BDDNoFeatureModel))
                 SatSolverCache.get(nfm(featureModel))
@@ -129,11 +129,12 @@ private object SatSolverCache {
 
 class SatSolverImpl(featureModel: BDDFeatureModel) {
     assert(featureModel != null)
+    val PROFILING = false
 
     /** init / constructor */
-    val solver = SolverFactory.newDefault();
-    //        solver.setTimeoutMs(1000);
-    solver.setTimeoutOnConflicts(100000)
+    val solver = SolverFactory.newDefault()
+    solver.setTimeoutMs(10000)
+//    solver.setTimeoutOnConflicts(100000)
 
     solver.addAllClauses(featureModel.clauses)
     var uniqueFlagIds: Map[String, Int] = featureModel.variables
@@ -146,12 +147,12 @@ class SatSolverImpl(featureModel: BDDFeatureModel) {
     def isSatisfiable(dnf: Iterator[Seq[Int]], lookupName: (Int) => String): Boolean = {
         this.lastModel = null // remove model from last satisfiability check
 
-        val PROFILING = false
 
         val startTime = System.currentTimeMillis();
 
+        val dnfl = dnf.toList
         if (PROFILING)
-            print("<SAT " + dnf.length + "; ")
+            print("<SAT " + dnfl.length + "; ")
 
         val startTimeSAT = System.currentTimeMillis();
         var constraintGroup: List[IConstr] = Nil
@@ -167,10 +168,9 @@ class SatSolverImpl(featureModel: BDDFeatureModel) {
                 }
             }
 
-            val dfnl = dnf.toList
 
             try {
-                for (clause <- dfnl) {
+                for (clause <- dnfl) {
                     val clauseArray: Array[Int] = new Array(clause.size)
                     var i = 0
                     for (literal <- clause) {
@@ -211,7 +211,7 @@ class SatSolverImpl(featureModel: BDDFeatureModel) {
                     else
                         falseList ::= fName
                 }
-                lastModel = Pair(trueList, falseList)
+                lastModel = (trueList, falseList)
             }
 
             if (PROFILING)
@@ -238,13 +238,15 @@ class SatSolverImpl(featureModel: BDDFeatureModel) {
      * This pair contains the model that was constructed during the last isSatisfiable call (if the result was true).
      * The first element contains the names of the features set to true, the second contains the names of the false features.
      */
-    var lastModel: Pair[List[String], List[String]] = null
+    var lastModel: (List[String], List[String]) = null
 
     def getLastModel() = lastModel
 
     var invalid: Boolean = false
 
     def invalidateCache() {
+        if (PROFILING)
+            println("<invalidating SAT cache>")
         invalid = true
     }
 }

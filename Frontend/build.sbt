@@ -8,9 +8,9 @@ mainClass in Runtime := Some("de.fosd.typechef.Frontend")
 //generate typechef.sh file with full classpath
 TaskKey[File]("mkrun") <<= (baseDirectory, fullClasspath in Runtime, mainClass in Runtime) map { (base, cp, main) =>
   val template = """#!/bin/sh
-java -ea -Xmx1536m -Xms128m -Xss10m -classpath "%s" %s "$@"
+java -ea -Xmx4g -Xms128m -Xss10m -classpath "%s" %s "$@"
 """
-  val mainStr = main getOrElse error("No main class specified")
+  val mainStr = main getOrElse sys.error("No main class specified")
   val contents = template.format(cp.files.absString, mainStr)
   val out = base / "../typechef.sh"
   IO.write(out, contents)
@@ -22,7 +22,7 @@ java -ea -Xmx1536m -Xms128m -Xss10m -classpath "%s" %s "$@"
 
 //generate a single fat jar file with the assembly plugin
 
-seq(assemblySettings: _*)
+Seq(assemblySettings: _*)
 
 test in assembly := {}
 

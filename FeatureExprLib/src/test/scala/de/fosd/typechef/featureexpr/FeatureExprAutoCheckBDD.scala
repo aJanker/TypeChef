@@ -1,14 +1,14 @@
 package de.fosd.typechef.featureexpr
 
-import bdd.BDDFeatureModel
-import org.scalacheck._
-import Gen._
-import FeatureExprFactory.bdd._
-import Prop.propBoolean
 import java.io._
-import sat.SATFeatureModel
 
-object FeatureExprAutoCheckBDD extends Properties("FeatureExpr") {
+import de.fosd.typechef.featureexpr.FeatureExprFactory.bdd._
+import de.fosd.typechef.featureexpr.bdd.{BDDFeatureExpr, BDDFeatureModel}
+import org.scalacheck.Gen._
+import org.scalacheck.Prop.propBoolean
+import org.scalacheck._
+
+object FeatureExprAutoCheckBDD extends Properties("FeatureExpr-BDD") {
     def feature(a: String) = createDefinedExternal(a)
     val featureNames = List("a", "b", "c", "d", "e", "f")
     val a = feature("a")
@@ -124,6 +124,12 @@ object FeatureExprAutoCheckBDD extends Properties("FeatureExpr") {
         true
     })
 
+
+    val fm = BDDFeatureModel.createFromDimacsFile("FeatureExprLib/src/test/resources/small.dimacs")
+    property("a.sat == a.sat2") = Prop.forAll((a: FeatureExpr) => {
+        val b = a.asInstanceOf[BDDFeatureExpr]
+        b.isSatisfiable(fm) == b.isSatisfiable2(fm)
+    })
 
     //
     //  property("endsWith") = Prop.forAll((a: String, b: String) => (a+b).endsWith(b))

@@ -163,14 +163,14 @@ public class XtcPreprocessor implements VALexer {
     }
 
 
-    List<Stream> lexers = null;
+    List<Iterator<Syntax>> lexers = null;
     Stack<FeatureExpr> stack;
 
-    private List<Stream> getCurrentLexer() throws FileNotFoundException {
+    private List<Iterator<Syntax>> getCurrentLexer() throws FileNotFoundException {
         if (lexers == null) {
             assert (file == null) == (fileReader == null) : "no file given";
 
-            if (file != null)
+            if (file != null && file.getParentFile()!=null)
                 I.add(file.getParentFile().getAbsolutePath());
             lexers = LexerInterface.createLexer(commandLine.toString(), fileReader, file, exceptionErrorHandler, iquIncludes, I, sysIncludes, macroFilter);
             stack = new Stack<FeatureExpr>();
@@ -182,8 +182,8 @@ public class XtcPreprocessor implements VALexer {
 
     @Override
     public LexerToken getNextToken() throws IOException {
-        Stream lexer = getCurrentLexer().get(0);
-        Syntax s = lexer.scan();
+        Iterator<Syntax> lexer = getCurrentLexer().get(0);
+        Syntax s = lexer.next();
         while (s.kind() != Syntax.Kind.EOF) {
             if (s.kind() == Syntax.Kind.CONDITIONAL) {
                 Syntax.Conditional c = s.toConditional();
@@ -211,7 +211,7 @@ public class XtcPreprocessor implements VALexer {
                     return new XtcToken(s, stack.peek());
             }
 
-            s = lexer.scan();
+            s = lexer.next();
         }
         getCurrentLexer().remove(0);
         if (getCurrentLexer().isEmpty())
@@ -265,11 +265,11 @@ public class XtcPreprocessor implements VALexer {
                 if (sat[i] == 0 || sat[i] == 1) {
                     String fname = pc.getPCManager().vars.getName(i);
 
+                    FeatureExpr var;
                     if (fname.length() > 10 && fname.substring(0, 9).equals("(defined ") && fname.substring(fname.length() - 1).equals(")"))
-                        fname = fname.substring(9, fname.length() - 1);
+                        var = FeatureExprLib.l().createDefinedExternal(fname.substring(9, fname.length() - 1));
                     else
-                        fname = formulaToName(fname);
-                    FeatureExpr var = FeatureExprLib.l().createDefinedExternal(fname);
+                        var = new XtcFExprAnalyzer().resolveFExpr(fname);
                     if (sat[i] == 0) var = var.not();
 
                     innerResult = innerResult.and(var);
@@ -282,19 +282,6 @@ public class XtcPreprocessor implements VALexer {
 
     }
 
-    private static String formulaToName(String fname) {
-        String res = "_" + fname.replace(' ', '_').
-                replace(">=", "_ge_").replace("<=", "_le_").
-                replace(">", "_gt_").replace("<", "_lt_").
-                replace("=", "_eq_").
-                replace("<<", "_shiftleft_").replace(">>", "_shiftright_").
-                replace("(", "").replace(")", "").
-                replace("+", "_plus_").replace("-", "_minus_");
-
-        System.err.println("Warning: depending on external macro definition: " + fname + " -> " + res);
-
-        return res;  //To change body of created methods use File | Settings | File Templates.
-    }
 
     public static class XtcToken implements LexerToken {
 

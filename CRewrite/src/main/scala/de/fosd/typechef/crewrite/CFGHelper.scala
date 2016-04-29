@@ -1,6 +1,6 @@
 package de.fosd.typechef.crewrite
 
-import de.fosd.typechef.parser.c.{ASTEnv, AST}
+import de.fosd.typechef.parser.c.{AST, ASTEnv}
 
 trait CFGHelper extends IntraCFG {
 
@@ -36,7 +36,8 @@ trait CFGHelper extends IntraCFG {
             s = s.drop(1)
 
             if (d.filter(_.eq(c)).isEmpty) {
-                r = (c, pred(c, env)) :: r
+                val toAdd = (c, pred(c, env))
+                r = toAdd :: r
                 s = s ++ r.head._2.map(x => x.entry)
                 d = d ++ List(c)
             }

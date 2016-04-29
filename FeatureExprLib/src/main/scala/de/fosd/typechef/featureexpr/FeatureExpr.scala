@@ -15,7 +15,7 @@ trait FeatureExpr extends Serializable {
     //or other ToString variations for debugging etc
     def collectDistinctFeatures: Set[String]
     def collectDistinctFeatureObjects: Set[SingleFeatureExpr]
-    def getSatisfiableAssignment(featureModel: FeatureModel, interestingFeatures: Set[SingleFeatureExpr], preferDisabledFeatures: Boolean): Option[Pair[List[SingleFeatureExpr], List[SingleFeatureExpr]]]
+    def getSatisfiableAssignment(featureModel: FeatureModel, interestingFeatures: Set[SingleFeatureExpr], preferDisabledFeatures: Boolean): Option[(List[SingleFeatureExpr], List[SingleFeatureExpr])]
 
     def or(that: FeatureExpr): FeatureExpr
     def and(that: FeatureExpr): FeatureExpr
@@ -27,6 +27,12 @@ trait FeatureExpr extends Serializable {
      */
     @deprecated("use simplify(b:FeatureExpr) instead", "revision bee6c4f5")
     def diff(b:FeatureExpr) : FeatureExpr = simplify(b)
+
+
+    // returns this expression as scala object
+    // The expression def(A)&!def(B)  returns  FeatureExprFactory.createDefinedExternal("A") and FeatureExprFactory.createDefinedExternal("B").not()
+    def toScalaString: String
+
     /**
      * Informal: Returns all the information in this that is not present in b.
      * this.simplify(b) is equivialent to this if the context b is guaranteed
@@ -35,11 +41,6 @@ trait FeatureExpr extends Serializable {
      * @return
      */
     def simplify(b:FeatureExpr) : FeatureExpr
-
-
-    // returns this expression as scala object
-    // The expression def(A)&!def(B)  returns  FeatureExprFactory.createDefinedExternal("A") and FeatureExprFactory.createDefinedExternal("B").not()
-    def toScalaString: String
 
     //equals, hashcode
 

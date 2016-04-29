@@ -156,9 +156,13 @@ public abstract class LexerOptions extends Options implements ILexerOptions {
         } else if (c == 'I') {
             // Paths need to be canonicalized, because include_next
             // processing needs to compare paths!
-            checkDirectoryExists(g.getOptarg());
             try {
-                systemIncludePath.add(new File(g.getOptarg()).getCanonicalPath());
+                String file = g.getOptarg();
+                File f = new File(file);
+                if (!(f.exists() && f.isDirectory()))
+                    System.err.println("Include directory " + file + ", " + f.getAbsolutePath() + " does not exist");
+                else
+                    systemIncludePath.add(f.getCanonicalPath());
             } catch (IOException e) {
                 throw new OptionException("path not found " + g.getOptarg());
             }
@@ -306,7 +310,7 @@ public abstract class LexerOptions extends Options implements ILexerOptions {
 
     @Override
     public List<VALexer.LexerInput> getInput() {
-        List<VALexer.LexerInput> result = new ArrayList(files.size());
+        List<VALexer.LexerInput> result = new ArrayList<>(files.size());
         for (String file : files)
             result.add(
                     new VALexer.FileSource(new File(file)));
@@ -333,6 +337,11 @@ public abstract class LexerOptions extends Options implements ILexerOptions {
     @Override
     public boolean isHandleWarningsAsErrors() {
         return false;
+    }
+
+    @Override
+    public boolean printLexerErrorsToStdErr() {
+        return true;
     }
 
 }

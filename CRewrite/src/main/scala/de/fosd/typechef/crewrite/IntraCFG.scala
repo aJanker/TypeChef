@@ -2,8 +2,8 @@ package de.fosd.typechef.crewrite
 
 
 import de.fosd.typechef.conditional._
+import de.fosd.typechef.featureexpr.{FeatureExpr, FeatureExprFactory}
 import de.fosd.typechef.parser.c._
-import de.fosd.typechef.featureexpr.{FeatureExprFactory, FeatureExpr}
 
 // implements intraprocedural conditional control flow (cfg) on top of
 // the typechef infrastructure
@@ -158,13 +158,13 @@ trait IntraCFG extends ASTNavigation with ConditionalNavigation {
     }
 
     // determine context of new element based on the current result
-    // the context is the not of all elements (or-d) together combined with the context of the source elemente
+    // the context is the not of all elements (or-d) together combined with the context of the source element
     // (ctx) and the context of the current element (curctx)
     private[crewrite] def getNewResCtx(curres: CFGRes, ctx: FeatureExpr, curctx: FeatureExpr) = {
         curres.map(_._1).fold(FeatureExprFactory.False)(_ or _).not() and ctx and curctx
     }
 
-    // checks reference equality of e in a given struture t (either product or list)
+    // checks reference equality of e in a given structure t (either product or list)
     protected def isPartOf(subterm: Product, term: Any): Boolean = {
         term match {
             case _: Product if subterm.asInstanceOf[AnyRef].eq(term.asInstanceOf[AnyRef]) => true
@@ -781,11 +781,7 @@ trait IntraCFG extends ASTNavigation with ConditionalNavigation {
 
                     case t: Expr => followSucc(t, ctx, oldres, env)
                     case t: ReturnStatement => getReturnStatementSucc(t, ctx, oldres, env)
-                    case t: Statement => {
-                        var res = getStmtSucc(t, ctx, oldres, env)
-                        res = findMethodCalls(t, env, oldres, ctx, res)
-                        res
-                    }
+                    case t: Statement => getStmtSucc(t, ctx, oldres, env)
 
                     //ChK: deactivate conditional expressions for now, since they do not contain variability and are
                     //not fully implemented anyway
@@ -799,7 +795,10 @@ trait IntraCFG extends ASTNavigation with ConditionalNavigation {
                     //            }
                     //          }
 
-                    case t: FunctionDef => oldres ++ List((env.featureExpr(t), env.featureExpr(t), t))
+                    case t: FunctionDef =>
+                        val fPC = env.featureExpr(t)
+                        val compCtx = getNewResCtx(oldres, ctx, fPC)
+                        oldres ++ List((compCtx, fPC, t))
                     case _ => List()
                 }
             }

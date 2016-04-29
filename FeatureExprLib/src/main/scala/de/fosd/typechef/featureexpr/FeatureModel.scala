@@ -4,5 +4,4 @@ trait FeatureModel {
     def and(expr: FeatureExpr): FeatureModel
     def assumeTrue(featurename: String): FeatureModel
     def assumeFalse(featurename: String): FeatureModel
-    def getClauses(): Set[String]
 }

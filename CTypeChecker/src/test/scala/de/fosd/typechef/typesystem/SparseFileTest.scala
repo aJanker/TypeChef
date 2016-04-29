@@ -1,17 +1,18 @@
 package de.fosd.typechef.typesystem
 
-import java.{util => ju, lang => jl}
-import org.junit._
-import java.io.{InputStream, FileNotFoundException}
-import de.fosd.typechef.parser.c.{ExternalDef, TestHelper, TranslationUnit}
-import de.fosd.typechef.lexer.{LexerException, InternalException}
+import java.io.{FileNotFoundException, InputStream}
+import java.{lang => jl, util => ju}
+
 import de.fosd.typechef.featureexpr.{FeatureExprFactory, FeatureModel}
+import de.fosd.typechef.lexer.{InternalException, LexerException}
+import de.fosd.typechef.parser.c.{ExternalDef, TestHelper, TranslationUnit}
+import org.junit._
 
 class SparseFileTest extends TestHelper {
 
     val folder = "sparse/"
     private def checkSparse(filename: String) {
-        println("==========")
+//        println("==========")
         def stream = getClass.getResourceAsStream("/" + folder + filename)
         var inputStream: InputStream = stream
         if (inputStream == null) {
@@ -50,7 +51,7 @@ class SparseFileTest extends TestHelper {
     private def check(ast: TranslationUnit, featureModel: FeatureModel): Boolean =
         new CTypeSystemFrontend(ast, featureModel) {
             override def checkingExternal(externalDef: ExternalDef) {}
-        }.checkAST()
+        }.makeSilent().checkAST().isEmpty
 
     private def readSparseInfo(file: InputStream, filename: String) = {
         val lines = scala.io.Source.fromInputStream(file).getLines().toList

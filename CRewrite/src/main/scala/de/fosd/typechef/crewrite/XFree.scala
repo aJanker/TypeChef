@@ -1,10 +1,9 @@
 package de.fosd.typechef.crewrite
 
-import org.kiama.rewriting.Rewriter._
-
+import de.fosd.typechef.featureexpr.FeatureModel
 import de.fosd.typechef.parser.c._
 import de.fosd.typechef.typesystem.{DeclUseMap, UseDeclMap}
-import de.fosd.typechef.featureexpr.FeatureModel
+import org.kiama.rewriting.Rewriter._
 
 // implements a simple analysis of freeing memory that was not dynamically allocated
 // https://www.securecoding.cert.org/confluence/display/seccode/MEM34-C.+Only+free+memory+allocated+dynamically
@@ -22,7 +21,7 @@ import de.fosd.typechef.featureexpr.FeatureModel
 // i  = ∅            // should be {(x,?)|x ∈ FV(S*)}
 // E  = {FunctionDef} // see MonotoneFW
 // F  = flow
-class XFree(env: ASTEnv, dum: DeclUseMap, udm: UseDeclMap, fm: FeatureModel, f: FunctionDef, casestudy: String) extends MonotoneFWIdLab(env, dum, udm, fm, f) with IntraCFG with CFGHelper with ASTNavigation with UsedDefinedDeclaredVariables {
+class XFree(env: ASTEnv, dum: DeclUseMap, udm: UseDeclMap, f: FunctionDef, fm: FeatureModel, casestudy: String) extends MonotoneFWIdLab(f, env, dum, udm, fm) with IntraCFG with CFGHelper with ASTNavigation with UsedDefinedDeclaredVariables {
 
     private val freecalls = {
         if (casestudy == "linux") List("free", "kfree")
@@ -38,7 +37,7 @@ class XFree(env: ASTEnv, dum: DeclUseMap, udm: UseDeclMap, fm: FeatureModel, f: 
     // get all declared variables without an initialization
     def gen(a: AST): L = {
         var res = l
-        val variables = manytd(query {
+        val variables = manytd(query[AST] {
             case InitDeclaratorI(AtomicNamedDeclarator(_, i: Id, _), _, None) => res ++= fromCache(i)
             case InitDeclaratorI(AtomicNamedDeclarator(_, i: Id, _), _, Some(initializer)) => {
                 val pmallocs = filterASTElems[PostfixExpr](initializer)
@@ -59,7 +58,7 @@ class XFree(env: ASTEnv, dum: DeclUseMap, udm: UseDeclMap, fm: FeatureModel, f: 
     // get variables that get an assignment with malloc
     def kill(a: AST): L = {
         var res = l
-        val assignments = manytd(query {
+        val assignments = manytd(query[AST] {
             case AssignExpr(target: Id, "=", source) => {
                 val pmallocs = filterASTElems[PostfixExpr](source)
 
@@ -114,7 +113,7 @@ class XFree(env: ASTEnv, dum: DeclUseMap, udm: UseDeclMap, fm: FeatureModel, f: 
         }
 
 
-        val freedvariables = manytd(query {
+        val freedvariables = manytd(query[AST] {
             // realloc(*ptr, size) is used for reallocation of memory
             case PostfixExpr(i@Id("realloc"), FunctionCall(l)) => {
                 // realloc has two arguments but more than two elements may be passed to
@@ -124,7 +123,7 @@ class XFree(env: ASTEnv, dum: DeclUseMap, udm: UseDeclMap, fm: FeatureModel, f: 
                 // form alternative groups. if so we look for Ids in each
                 // of the alternative elements. if not we stop, because then we encounter
                 // a size element.
-                var actx = List(l.exprs.head.feature)
+                var actx = List(l.exprs.head.condition)
                 var finished = false
 
                 for (ni <- filterAllASTElems[Id](l.exprs.head.entry))
@@ -134,10 +133,10 @@ class XFree(env: ASTEnv, dum: DeclUseMap, udm: UseDeclMap, fm: FeatureModel, f: 
                     if (actx.reduce(_ or _) isTautology fm)
                         finished = true
 
-                    if (!finished && actx.forall(_ and ce.feature isContradiction fm)) {
+                    if (!finished && actx.forall(_ and ce.condition isContradiction fm)) {
                         for (ni <- filterAllASTElems[Id](ce.entry))
                             res ::= ni
-                        actx ::= ce.feature
+                        actx ::= ce.condition
                     } else {
                         finished = true
                     }

@@ -1,13 +1,13 @@
 package de.fosd.typechef
 
-import conditional.{Choice, Opt}
-import featureexpr.sat.SATFeatureModel
-import featureexpr.{FeatureExprFactory, FeatureModel, SingleFeatureExpr}
 import java.io.{File, FileWriter}
-import parser.c._
-import parser.c.FunctionDef
-import parser.c.PostfixExpr
-import scala.Some
+import java.lang.management.ManagementFactory
+import java.util.concurrent.TimeUnit
+
+import de.fosd.typechef.conditional.{Choice, Opt}
+import de.fosd.typechef.featureexpr.sat.SATFeatureModel
+import de.fosd.typechef.featureexpr.{FeatureExprFactory, FeatureModel, SingleFeatureExpr}
+import de.fosd.typechef.parser.c.{FunctionDef, PostfixExpr, _}
 
 /**
  * Created with IntelliJ IDEA.
@@ -175,5 +175,47 @@ object Extras {
         val sat3 = BA.isSatisfiable(fm)
 
         println()
+    }
+
+    class StopWatch {
+        val thread = ManagementFactory.getThreadMXBean
+        var lastStart: Long = thread.getCurrentThreadCpuTime
+        var currentPeriod: String = "none"
+        var currentPeriodId: Int = 0
+        var times: Map[(Int, String), Long] = Map()
+
+        def toMS(value: Long) = TimeUnit.MILLISECONDS.convert(value, TimeUnit.NANOSECONDS)
+        def between(start: Long, end: Long) = toMS((end - start))
+
+        private def genId(): Int = {
+            currentPeriodId += 1; currentPeriodId
+        }
+
+        def start(period: String) {
+            val now = thread.getCurrentThreadCpuTime
+            val lastTime = between(lastStart, now)
+            times = times + ((genId(), currentPeriod) -> lastTime)
+            lastStart = thread.getCurrentThreadCpuTime
+            currentPeriod = period
+        }
+
+        def get() = {
+            times.toList.filterNot(x => x._1._2 == "none" || x._1._2 == "done").sortBy(_._1._1).map(y => (y._1._2, y._2))
+        }
+
+        def get(period: String): Long = times.filter(v => v._1._2 == period).headOption.map(_._2).getOrElse(0)
+
+        override def toString = {
+            var res = "timing "
+            val switems = times.toList.filterNot(x => x._1._2 == "none" || x._1._2 == "done").sortBy(_._1._1)
+
+            if (switems.size > 0) {
+                res = res + "("
+                res = res + switems.map(_._1._2).reduce(_ + ", " + _)
+                res = res + ")\n"
+                res = res + switems.map(_._2.toString).reduce(_ + ";" + _)
+            }
+            res
+        }
     }
 }

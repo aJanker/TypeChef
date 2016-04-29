@@ -14,6 +14,25 @@ import java.util.List;
 
 
 public class FrontendOptions extends CAnalysisOptions implements ParserOptions {
+    public boolean parse = true,
+            typecheck = false,
+            ifdeftoif = false,
+            decluse = false,
+            writeInterface = false,
+            dumpcfg = false,
+            serializeAST = false,
+            reuseAST = false,
+            writeDebugInterface = false,
+            recordTiming = false,
+            parserStatistics = false,
+            parserResults = true,
+            simplifyPresenceConditions = false,
+            writePI = false,
+            printInclude = false,
+            printVersion = false,
+            defaultPC = true,
+            printFeaturesPerFunction = false;
+    
     private final static char F_PARSE = Options.genOptionId();
     private final static char F_INTERFACE = Options.genOptionId();
     private final static char F_WRITEPI = Options.genOptionId();
@@ -24,37 +43,25 @@ public class FrontendOptions extends CAnalysisOptions implements ParserOptions {
     private final static char F_RECORDTIMING = Options.genOptionId();
     private final static char F_FILEPC = Options.genOptionId();
     private final static char F_PARSERSTATS = Options.genOptionId();
+    private final static char F_SIMPLIFYPRESENCECONDITIONS = Options.genOptionId();
     private final static char F_HIDEPARSERRESULTS = Options.genOptionId();
     private final static char F_BDD = Options.genOptionId();
     private final static char F_ERRORXML = Options.genOptionId();
-    private static final char TY_VERSION = genOptionId();
-    private static final char TY_HELP = genOptionId();
+    private final static char TY_DEBUG_INCLUDES = genOptionId();
+    private final static char TY_VERSION = genOptionId();
+    private final static char TY_HELP = genOptionId();
     private final static char F_DISABLEPC = Options.genOptionId();
+    private final static char F_SIMPLIFYFM = Options.genOptionId();
+    private final static char F_PRINTFEATURESPERFUNCTION = Options.genOptionId();
     private final File _autoErrorXMLFile = new File(".");
     private final String serializeTUnitFileExtension = ".tunit";
-    public boolean parse = true,
-            typecheck = false,
-            writeInterface = false,
-            dumpcfg = false,
-            doublefree = false,
-            uninitializedmemory = false,
-            xfree = false,
-            danglingswitchcode = false,
-            serializeAST = false,
-            reuseAST = false,
-            writeDebugInterface = false,
-            recordTiming = false,
-            parserStatistics = false,
-            parserResults = true,
-            writePI = false,
-            printVersion = false,
-            defaultPC = true;
     protected File errorXMLFile = null;
     private String outputStem = "";
     private String filePresenceConditionFile = "";
     private Function3<FeatureExpr, String, Position, Object> _renderParserError;
     private FeatureExpr filePC = null;
     private FeatureExpr localFM = null;
+    private File simplifyFM = null;
 
     @Override
     public List<Options.OptionGroup> getOptionGroups() {
@@ -73,6 +80,9 @@ public class FrontendOptions extends CAnalysisOptions implements ParserOptions {
                 new Option("dumpcfg", LongOpt.NO_ARGUMENT, F_DUMPCFG, null,
                         "Lex, parse, and dump control flow graph"),
 
+                new Option("printFeaturesPerFunction", LongOpt.NO_ARGUMENT, F_PRINTFEATURESPERFUNCTION, null,
+                        "Writes out the amount of features per function"),
+
                 new Option("output", LongOpt.REQUIRED_ARGUMENT, 'o', "file",
                         "Path to output files (no extension, creates .pi, .macrodbg etc files)."),
 
@@ -89,7 +99,9 @@ public class FrontendOptions extends CAnalysisOptions implements ParserOptions {
                         "Reuse serialized .ast instead of parsing, if availabe."),
                 new Option("recordTiming", LongOpt.NO_ARGUMENT, F_RECORDTIMING, null,
                         "Report times for all phases."),
-
+                new Option("simplifyFM", LongOpt.REQUIRED_ARGUMENT, F_SIMPLIFYFM, null,
+                        "Use an additional feature model or extracted configuration presence condition for an more" +
+                                " efficient interaction degree calculation"),
                 new Option("filePC", LongOpt.REQUIRED_ARGUMENT, F_FILEPC, "file",
                         "Presence condition for the file (format like --featureModelFExpr). Default 'file.pc'."),
                 new Option("bdd", LongOpt.NO_ARGUMENT, F_BDD, null,
@@ -103,9 +115,13 @@ public class FrontendOptions extends CAnalysisOptions implements ParserOptions {
                 new Option("hideparserresults", LongOpt.NO_ARGUMENT, F_HIDEPARSERRESULTS, null,
                         "Do not show parser results."),
                 new Option("parserstatistics", LongOpt.NO_ARGUMENT, F_PARSERSTATS, null,
-                        "Print parser statistics.")
+                        "Print parser statistics."),
+                new Option("simplifyPresenceConditions", LongOpt.NO_ARGUMENT, F_SIMPLIFYPRESENCECONDITIONS, null,
+                "Simplify presence conditions after parsing.")
         ));
         r.add(new OptionGroup("Misc", 1000,
+                new Option("printIncludes", LongOpt.NO_ARGUMENT, TY_DEBUG_INCLUDES, null,
+                        "Prints gathered include information for debugging"),
                 new Option("version", LongOpt.NO_ARGUMENT, TY_VERSION, null,
                         "Prints version number"),
                 new Option("help", LongOpt.NO_ARGUMENT, TY_HELP, null,
@@ -148,6 +164,8 @@ public class FrontendOptions extends CAnalysisOptions implements ParserOptions {
             parserResults = false;
         } else if (c == F_PARSERSTATS) {
             parserStatistics = true;
+        } else if (c == F_SIMPLIFYPRESENCECONDITIONS) {
+            simplifyPresenceConditions = true;
         } else if (c == F_WRITEPI) {
             writePI = true;
         } else if (c == F_DISABLEPC) {
@@ -161,11 +179,18 @@ public class FrontendOptions extends CAnalysisOptions implements ParserOptions {
                 checkFileWritable(g.getOptarg());
                 errorXMLFile = new File(g.getOptarg());
             }
+        } else if (c == TY_DEBUG_INCLUDES) { // --printInclude
+            printInclude = true;
         } else if (c == TY_VERSION) { // --version
             printVersion = true;
         } else if (c == TY_HELP) {//--help
             printUsage();
             printVersion = true;
+        } else if (c == F_SIMPLIFYFM) {
+            checkFileExists(g.getOptarg());
+            simplifyFM = new File(g.getOptarg());
+        } else if (c == F_PRINTFEATURESPERFUNCTION){
+            printFeaturesPerFunction = true;
         } else
             return super.interpretOption(c, g);
 
@@ -198,11 +223,15 @@ public class FrontendOptions extends CAnalysisOptions implements ParserOptions {
         return outputStem + ".dbginterface";
     }
 
-    String getFilePresenceConditionFilename() {
+    public String getFilePresenceConditionFilename() {
         if (filePresenceConditionFile.length() > 0)
             return filePresenceConditionFile;
         else
             return outputStem + ".pc";
+    }
+
+    public File getSimplifyFM() {
+        return simplifyFM;
     }
 
 
@@ -247,6 +276,26 @@ public class FrontendOptions extends CAnalysisOptions implements ParserOptions {
         return outputStem + ".cfg";
     }
 
+    public String getStmtInteractionDegreeFilename() {
+        return outputStem + ".stmt.degree";
+    }
+
+    public String getCFGDegreeFilename() {
+        return getOutputStem() + ".cfgdegree";
+    }
+
+    public String getStopWatchFilename() {
+        return getOutputStem() + ".astimes";
+    }
+
+    public String getWarningStmtInteractionDegreeFilename() {
+        return outputStem + ".stmt.warn.degree";
+    }
+
+    public String getErrorStmtInteractionDegreeFilename() {
+        return outputStem + ".stmt.error.degree";
+    }
+
     public String getCCFGDotFilename() {
         return outputStem + ".cfg.dot";
     }
@@ -264,6 +313,10 @@ public class FrontendOptions extends CAnalysisOptions implements ParserOptions {
         _renderParserError = r;
     }
 
+    public boolean simplifyPresenceConditions() {
+        return simplifyPresenceConditions;
+    }
+
     public boolean printParserResult() {
         return parserResults;
     }
@@ -278,6 +331,24 @@ public class FrontendOptions extends CAnalysisOptions implements ParserOptions {
     public boolean isPrintVersion() {
         return printVersion;
     }
+
+    public boolean isPrintIncludes() { return printInclude; }
+
+    public void printInclude() {
+        System.out.println("Included headers:");
+        for (String header: this.getIncludedHeaders()) {
+            System.out.println("  "+header);
+        }
+        System.out.println("System Include Paths:");
+        for (String dir: this.getIncludePaths()) {
+            System.out.println("  "+dir);
+        }
+        System.out.println("Quote Include Paths:");
+        for (String dir: this.getQuoteIncludePath()) {
+            System.out.println("  "+dir);
+        }
+    }
+
 
     public boolean getUseDefaultPC() {
         return defaultPC;

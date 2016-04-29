@@ -1,9 +1,8 @@
 package de.fosd.typechef.parser.c
 
 import de.fosd.typechef.conditional._
-
+import de.fosd.typechef.featureexpr.{FeatureExpr, FeatureExprFactory}
 import org.kiama.rewriting.Rewriter._
-import de.fosd.typechef.featureexpr.{FeatureExprFactory, FeatureExpr}
 
 trait ConditionalNavigation {
 
@@ -22,7 +21,7 @@ trait ConditionalNavigation {
         val eparent = env.parent(e)
         eparent match {
             case o: Opt[_] => o
-            case c: Conditional[_] => Conditional.toOptList(c).head
+            case c: Conditional[_] => c.toOptList.head
             case a: AST => parentOpt(a, env)
             case _ => null
         }
@@ -45,17 +44,15 @@ trait ConditionalNavigation {
     }
 
     // check recursively for any nodes that have an annotation != True
-    def isVariable(e: Product, env: ASTEnv, ctx : FeatureExpr = FeatureExprFactory.True): Boolean = {
-        val variable = manytd(query {
-            case x: AST =>
-                val fExp = env.featureExpr(x).diff(ctx)
-                if (fExp != FeatureExprFactory.True &&
-                    fExp != FeatureExprFactory.False)
-                    return true
+    def isVariable(e: Product): Boolean = {
+        var res = false
+        val variable = manytd(query[Product] {
+            case Opt(f, _) => if (f != FeatureExprFactory.False && f != FeatureExprFactory.True) res = true
+            case x => res = res
         })
 
         variable(e)
-        false
+        res
     }
 
     def filterAllOptElems(e: Product): List[Opt[_]] = {
@@ -87,10 +84,26 @@ trait ConditionalNavigation {
         filterAllFeatureExprHelper(e)
     }
 
+    def filterAllSingleFeatureExpr(e: Product): List[String] = {
+        def filterAllSingleFeatureExprHelper(a: Any): List[String] = {
+            a match {
+                case Opt(feature, entry) => feature.collectDistinctFeatures.toList ++ (if (entry.isInstanceOf[Product]) entry.asInstanceOf[Product].productIterator.toList.flatMap(filterAllSingleFeatureExprHelper).distinct
+                else List())
+                case Choice(feature, thenBranch, elseBranch) => feature.collectDistinctFeatures.toList ++ feature.not().collectDistinctFeatures.toList ++
+                    thenBranch.asInstanceOf[Product].productIterator.toList.flatMap(filterAllSingleFeatureExprHelper) ++
+                    elseBranch.asInstanceOf[Product].productIterator.toList.flatMap(filterAllSingleFeatureExprHelper).distinct
+                case l: List[_] => l.flatMap(filterAllSingleFeatureExprHelper).distinct
+                case x: Product => x.productIterator.toList.flatMap(filterAllSingleFeatureExprHelper).distinct
+                case _ => List()
+            }
+        }
+        filterAllSingleFeatureExprHelper(e)
+    }
+
     // return all Opt and One elements
     def filterAllVariableElems(e: Product): List[Product] = {
         var res: List[Product] = List()
-        val filter = manytd(query {
+        val filter = manytd(query[Product] {
             case o: Opt[_] => res ::= o
             case o: One[_] => res ::= o
         })

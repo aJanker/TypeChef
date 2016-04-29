@@ -17,10 +17,7 @@ import xtc.lang.cpp.Syntax;
 import java.io.*;
 import java.net.URISyntaxException;
 import java.net.URL;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Stack;
+import java.util.*;
 
 /**
  * the goal of this test is to compare the lexers of
@@ -385,8 +382,8 @@ public class TypeChefVsXtc {
         BufferedReader checkFile = new BufferedReader(new InputStreamReader(
                 new ExtraLinebreakInputStream(inputStream)));
 
-
-        List<Stream> lexers = LexerInterface.createLexer("", checkFile, getFile(filename), new LexerInterface.ExceptionErrorHandler(),
+        @SuppressWarnings("unchecked")
+        List<Iterator<Syntax>> lexers = LexerInterface.createLexer("", checkFile, getFile(filename), new LexerInterface.ExceptionErrorHandler(),
                 Collections.EMPTY_LIST, Collections.singletonList(getFile(filename).getParent()), Collections.EMPTY_LIST, null);
 
         //create TypeChef style token stream
@@ -394,8 +391,8 @@ public class TypeChefVsXtc {
 
         Stack<FeatureExpr> stack = new Stack<FeatureExpr>();
         stack.push(FeatureExprFactory.True());
-        for (Stream lexer : lexers) {
-            Syntax s = lexer.scan();
+        for (Iterator<Syntax> lexer : lexers) {
+            Syntax s = lexer.next();
             while (s.kind() != Syntax.Kind.EOF) {
                 if (s.kind() == Syntax.Kind.CONDITIONAL) {
                     Syntax.Conditional c = s.toConditional();
@@ -411,7 +408,7 @@ public class TypeChefVsXtc {
                 if (t.isLanguageToken())
                     result.add(t);
 
-                s = lexer.scan();
+                s = lexer.next();
             }
         }
         return result;

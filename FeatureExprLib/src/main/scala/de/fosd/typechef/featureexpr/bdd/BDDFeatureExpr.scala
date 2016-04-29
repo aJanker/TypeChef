@@ -1,11 +1,11 @@
 package de.fosd.typechef.featureexpr.bdd
 
 import de.fosd.typechef.featureexpr._
-import bdd.FExprBuilder._
+import de.fosd.typechef.featureexpr.bdd.FExprBuilder._
 import net.sf.javabdd._
-import collection.mutable.{WeakHashMap, Map}
-import de.fosd.typechef.featureexpr._
-import annotation.tailrec
+
+import scala.annotation.tailrec
+import scala.collection.mutable.{Map, WeakHashMap}
 
 
 object FeatureExprHelper {
@@ -26,106 +26,6 @@ object FeatureExprHelper {
 }
 
 
-//trait FeatureExpr {
-//    /**
-//     * x.isSatisfiable(fm) is short for x.and(fm).isSatisfiable
-//     * but is faster because FM is cached
-//     */
-//    def isSatisfiable(fm: FeatureModel): Boolean
-//    protected def calcSize: Int
-//    def toTextExpr: String //or other ToString variations for debugging etc
-//    protected def collectDistinctFeatures: Set[String]
-//
-//    def or(that: FeatureExpr): FeatureExpr = FExprBuilder.or(this, that)
-//    def and(that: FeatureExpr): FeatureExpr = FExprBuilder.and(this, that)
-//    def not(): FeatureExpr = FExprBuilder.not(this)
-//    def implies(that: FeatureExpr) = FExprBuilder.imp(this, that)
-//    def xor(that: FeatureExpr) = FExprBuilder.xor(this, that)
-//    def equiv(that: FeatureExpr) = FExprBuilder.biimp(this, that)
-
-//
-//    //equals, hashcode
-//
-//
-//
-//
-//
-//    def unary_! = not
-//    def &(that: FeatureExpr) = and(that)
-//    def |(that: FeatureExpr) = or(that)
-//
-//    def orNot(that: FeatureExpr) = this or (that.not)
-//    def andNot(that: FeatureExpr) = this and (that.not)
-//    def mex(that: FeatureExpr): FeatureExpr = (this and that).not
-//
-//    def isContradiction(): Boolean = isContradiction(NoFeatureModel)
-//    def isTautology(): Boolean = isTautology(NoFeatureModel)
-//    def isDead(): Boolean = isContradiction(NoFeatureModel)
-//    def isBase(): Boolean = isTautology(NoFeatureModel)
-//    def isSatisfiable(): Boolean = isSatisfiable(NoFeatureModel)
-//    /**
-//     * FM -> X is tautology if FM.implies(X).isTautology or
-//     * !FM.and.(x.not).isSatisfiable
-//     *
-//     **/
-//    def isTautology(fm: FeatureModel): Boolean = !this.not.isSatisfiable(fm)
-//    def isContradiction(fm: FeatureModel): Boolean = !isSatisfiable(fm)
-//
-//
-//    /**
-//     * uses a SAT solver to determine whether two expressions are
-//     * equivalent.
-//     *
-//     * for performance reasons, it checks pointer
-//     * equivalence first, but won't use the recursive equals on aexpr
-//     * (there should only be few cases when equals is more
-//     * accurate than eq, which are not worth the performance
-//     * overhead)
-//     */
-//    def equivalentTo(that: FeatureExpr): Boolean = (this eq that) || (this equiv that).isTautology();
-//    def equivalentTo(that: FeatureExpr, fm: FeatureModel): Boolean = (this eq that) || (this equiv that).isTautology(fm);
-//
-//    protected def indent(level: Int): String = "\t" * level
-//
-//    final lazy val size: Int = calcSize
-//
-//    /**
-//     * heuristic to determine whether a feature expression is small
-//     * (may be used to decide whether to inline it or not)
-//     *
-//     * use with care
-//     */
-//    def isSmall(): Boolean = size <= 10
-//
-//    //    /**
-//    //     * map function that applies to all leafs in the feature expression (i.e. all DefinedExpr nodes)
-//    //     */
-//    //    def mapDefinedExpr(f: DefinedExpr => FeatureExpr, cache: Map[FeatureExpr, FeatureExpr]): FeatureExpr
-//
-//    /**
-//     * Converts this formula to a textual expression.
-//     */
-//    override def toString: String = toTextExpr
-//
-//
-//    /**
-//     * Prints the textual representation of this formula on a Writer. The result shall be equivalent to
-//     * p.print(toTextExpr), but it should avoid consuming so much temporary space.
-//     * @param p the output Writer
-//     */
-//    def print(p: Writer) = p.write(toTextExpr)
-//    def debug_print(indent: Int): String = toTextExpr
-//
-//
-//    /**
-//     * simple translation into a FeatureExprValue if needed for some reason
-//     * (creates IF(expr, 1, 0))
-//     */
-//    def toFeatureExprValue: FeatureExprValue =
-//        FExprBuilder.createIf(this, FExprBuilder.createValue(1l), FExprBuilder.createValue(0l))
-//
-//}
-
 
 /**
  * Propositional (or boolean) feature expressions., based on a BDD library
@@ -133,6 +33,8 @@ object FeatureExprHelper {
 class BDDFeatureExpr(private[featureexpr] val bdd: BDD) extends FeatureExpr {
 
     import CastHelper._
+
+    def leak() = bdd
 
     def or(that: FeatureExpr): FeatureExpr = {
         if (that == FeatureExprFactory.True) FeatureExprFactory.True
@@ -145,7 +47,7 @@ class BDDFeatureExpr(private[featureexpr] val bdd: BDD) extends FeatureExpr {
     }
     def not(): FeatureExpr = FExprBuilder.not(this)
 
-    def simplify(b:FeatureExpr) : FeatureExpr = new BDDFeatureExpr(this.bdd.simplify(asBDDFeatureExpr(b).bdd))
+    def simplify(b: FeatureExpr): FeatureExpr = FExprBuilder.synchronized {new BDDFeatureExpr(this.bdd.simplify(asBDDFeatureExpr(b).bdd))}
 
     /**
      * frees the space occupied by this bdd in the bdd library.
@@ -170,12 +72,12 @@ class BDDFeatureExpr(private[featureexpr] val bdd: BDD) extends FeatureExpr {
     // Be careful if that changes, though.
     override def equiv(that: FeatureExpr) = FExprBuilder.biimp(this, asBDDFeatureExpr(that))
 
-    def getSatisfiableAssignment(featureModel: FeatureModel, interestingFeatures: Set[SingleFeatureExpr], preferDisabledFeatures: Boolean): Option[Pair[List[SingleFeatureExpr], List[SingleFeatureExpr]]] = {
+    def getSatisfiableAssignment(featureModel: FeatureModel, interestingFeatures: Set[SingleFeatureExpr], preferDisabledFeatures: Boolean): Option[(List[SingleFeatureExpr], List[SingleFeatureExpr])] = FExprBuilder.synchronized {
         val fm = asBDDFeatureModel(featureModel)
         // optimization: if the interestingFeatures-Set is empty and this FeatureExpression is TRUE, we will always return empty sets
         // here we assume that the featureModel is satisfiable (which is checked at FM-instantiation)
         if (this.bdd.equals(TRUE) && interestingFeatures.isEmpty) {
-            return Some(Pair(List(), List())) // is satisfiable, but no interesting features in solution
+            return Some((List(), List())) // is satisfiable, but no interesting features in solution
         }
         val bddDNF = toDnfClauses(toScalaAllSat((bdd and fm.extraConstraints.bdd).not().allsat()))
         // get one satisfying assignment (a list of features set to true, and a list of features set to false)
@@ -184,7 +86,7 @@ class BDDFeatureExpr(private[featureexpr] val bdd: BDD) extends FeatureExpr {
         // the result will only contain interesting features. Even parts of this expression will be omitted if uninteresting.
         var remainingInterestingFeatures = interestingFeatures
         assignment match {
-            case Some(Pair(trueFeatures, falseFeatures)) => {
+            case Some((trueFeatures, falseFeatures)) => {
                 if (preferDisabledFeatures) {
                     var enabledFeatures: Set[SingleFeatureExpr] = Set()
                     for (f <- trueFeatures) {
@@ -225,7 +127,7 @@ class BDDFeatureExpr(private[featureexpr] val bdd: BDD) extends FeatureExpr {
      * x.isSatisfiable(fm) is short for x.and(fm).isSatisfiable
      * but is faster because FM is cached
      */
-    def isSatisfiable(f: FeatureModel): Boolean = {
+    def isSatisfiable(f: FeatureModel): Boolean = FExprBuilder.synchronized {
         val fm = asBDDFeatureModel(f)
 
         if (bdd.isOne) true //assuming a valid feature model
@@ -249,19 +151,39 @@ class BDDFeatureExpr(private[featureexpr] val bdd: BDD) extends FeatureExpr {
     }
 
     /**
+     * alternative implementation of issatisfiable that uses a different CNF conversion
+     * with more variables but possibly fewer clauses
+     *
+     * the difference is only relevant when dimacs-feature models are involved
+     */
+    def isSatisfiable2(f: FeatureModel): Boolean = FExprBuilder.synchronized {
+        val fm = asBDDFeatureModel(f)
+
+        if (bdd.isOne) true //assuming a valid feature model
+        else if (bdd.isZero) false
+        else if (fm == BDDNoFeatureModel || fm == null) bdd.satOne() != FExprBuilder.FALSE
+        //combination with a small FeatureExpr feature model
+        else if (fm.clauses.isEmpty) (bdd and fm.extraConstraints.bdd and fm.assumptions.bdd).satOne() != FExprBuilder.FALSE
+        //combination with SAT
+        else FeatureExprHelper.cacheIsSatisfiable.getOrElseUpdate((this.bdd, fm),
+            SatSolver.isSatisfiable(fm, toCNFClauses((bdd and fm.extraConstraints.bdd)), FExprBuilder.lookupFeatureName)
+        )
+    }
+
+    /**
      * Check structural equality, assuming that all component nodes have already been canonicalized.
      * The default implementation checks for pointer equality.
      */
     private[featureexpr] def equal1Level(that: FeatureExpr) = this eq that
 
     final override def equals(that: Any) = that match {
-        case x: BDDFeatureExpr => bdd.equals(x.bdd)
+        case x: BDDFeatureExpr => FExprBuilder.synchronized {bdd.equals(x.bdd)}
         case _ => super.equals(that)
     }
-    override def hashCode = bdd.hashCode
+    override def hashCode = FExprBuilder.synchronized {bdd.hashCode}
 
 
-    protected def calcSize: Int = bdd.nodeCount
+    protected def calcSize: Int = FExprBuilder.synchronized {bdd.nodeCount}
 
     /**
      * heuristic to determine whether a feature expression is small
@@ -280,7 +202,7 @@ class BDDFeatureExpr(private[featureexpr] val bdd: BDD) extends FeatureExpr {
      * Converts this formula to a textual expression.
      */
     def toTextExpr: String =
-        toSATFeatureExpr().toTextExpr
+        FExprBuilder.synchronized {toSATFeatureExpr().toTextExpr}
 
     /**
      * Iterator[Array[(Byte,String)]]
@@ -288,7 +210,7 @@ class BDDFeatureExpr(private[featureexpr] val bdd: BDD) extends FeatureExpr {
      * Each element of the clause-array is a single feature.
      * The feature is given as tuple (a,b): a==0 means the feature is negated, b is the name of the feature.
      */
-    def getBddAllSat: Iterator[Array[(Byte, String)]] = {
+    def getBddAllSat: Iterator[Array[(Byte, String)]] = FExprBuilder.synchronized {
         def clause(d: Array[Byte]): Array[(Byte, String)] = d.zip(0 to (d.length - 1)).filter(_._1 >= 0).map(
             x => (x._1, FExprBuilder.lookupFeatureName(x._2))
         )
@@ -299,7 +221,7 @@ class BDDFeatureExpr(private[featureexpr] val bdd: BDD) extends FeatureExpr {
         toSATFeatureExpr().toScalaString
 
     override def toString: String =
-        toSATFeatureExpr().toString
+        FExprBuilder.synchronized {toSATFeatureExpr().toString}
 
     def toTextExprDNF: String =
         printbdd(bdd, "1", "0", " && ", " || ", i => "definedEx(" + FExprBuilder.lookupFeatureName(i) + ")")
@@ -315,7 +237,7 @@ class BDDFeatureExpr(private[featureexpr] val bdd: BDD) extends FeatureExpr {
             (v and toSATFeatureExpr(bdd.high())) or (v.not and toSATFeatureExpr(bdd.low()))
         }
 
-    private def printbdd(bdd: BDD, one: String, zero: String, and: String, or: String, toName: (Int) => String): String =
+    private def printbdd(bdd: BDD, one: String, zero: String, and: String, or: String, toName: (Int) => String): String = FExprBuilder.synchronized {
         if (bdd.isOne()) one
         else if (bdd.isZero()) zero
         else {
@@ -325,8 +247,9 @@ class BDDFeatureExpr(private[featureexpr] val bdd: BDD) extends FeatureExpr {
 
             return bddAllSat.map(clause(_)).mkString(or)
         }
+    }
 
-    private def bddAllSat: Iterator[Array[Byte]] = toScalaAllSat(bdd.allsat())
+    private def bddAllSat: Iterator[Array[Byte]] = FExprBuilder.synchronized {toScalaAllSat(bdd.allsat())}
 
     private def toScalaAllSat(allsat: java.util.List[_]): Iterator[Array[Byte]] =
         scala.collection.JavaConversions.asScalaIterator(allsat.asInstanceOf[java.util.List[Array[Byte]]].iterator())
@@ -345,11 +268,103 @@ class BDDFeatureExpr(private[featureexpr] val bdd: BDD) extends FeatureExpr {
 
 
     /**
+     * new (more efficient) translation to CNF that does not use allsat
+     *
+     * output clauses format with sets of variable ids (negative means negated)
+     *
+     * introduces 3 additional variables for every node in the BDD
+     */
+    private def toCNFClauses(topbdd: BDD): Iterator[Seq[Int]] = FExprBuilder.synchronized {
+        var maxId = FExprBuilder.maxFeatureId
+        def genId = { maxId += 1; maxId }
+
+        var result: List[Seq[Int]] = Nil
+        var bddIds: Map[BDD, Int] = Map()
+        var incomingEdges: Map[BDD, Set[Int]] = Map()
+        def addIncomingEdge(bdd: BDD, source: Int) {
+            incomingEdges += (bdd -> incomingEdges.getOrElse(bdd, Set()).+(source))
+        }
+
+        var bddsTodo: Set[BDD] = Set(topbdd)
+        var bddsDone: Set[BDD] = Set()
+
+        while (!bddsTodo.isEmpty) {
+            val bddnode = bddsTodo.head
+            bddsTodo = bddsTodo.tail
+            bddsDone += bddnode
+
+            //for each internal node, create three fresh SAT variables
+            val bddIn = genId
+
+            bddIds += (bdd -> bddIn)
+
+            if (!(bddnode.isOne || bddnode.isZero)) {
+                val bddTrue = genId
+                val bddFalse = genId
+                val bddFeature = bdd.`var`()
+                //bddTrue <=> bddIn and bdd.feature
+                // ( ==> (!bddTrue || bddIn) && (!bddTrue || bdd.feature) && (bddTrue || !bddIn || !bdd.feature)
+                result = Seq(-bddTrue, bddIn) :: Seq(-bddTrue, bddFeature) :: Seq(bddTrue, -bddIn, -bddFeature) :: result
+                //bddFalse <=> bddIn and !bdd.feature
+                result = Seq(-bddFalse, bddIn) :: Seq(-bddFalse, -bddFeature) :: Seq(bddFalse, -bddIn, bddFeature) :: result
+
+                addIncomingEdge(bddnode.low(), bddFalse)
+                addIncomingEdge(bddnode.high(), bddTrue)
+
+                if (!(bddsDone contains bddnode.low()))
+                    bddsTodo += bddnode.low()
+                if (!(bddsDone contains bddnode.high()))
+                    bddsTodo += bddnode.high()
+            }
+        }
+
+        for ((bddnode, incomingEdgeSet) <- incomingEdges) {
+            if (bdd.isOne) {
+                //require one of the incoming edges
+                result ::= incomingEdgeSet.toSeq
+            }
+            else if (bdd.isZero) {
+                //require no incoming edge
+                result ++= incomingEdgeSet.map(e => Seq(-e))
+            } else {
+                val bddIn = bddIds(bddnode)
+
+                //a bddnode with incomming edges from A, B, C (which are the extra variables representing true or false of a decision node)
+                //is encoded as
+                // bddIn <=> A or B or C
+                result ::= incomingEdgeSet.toSeq :+ (-bddIn)
+                for (edge <- incomingEdgeSet)
+                    result ::= Seq(bddIn, -edge)
+            }
+        }
+
+
+        result.iterator
+    }
+
+
+    /**
      * helper function for statistics and such that determines which
      * features are involved in this feature expression
+     *
+     * new implementation without allsat
      */
-    private def collectDistinctFeatureIds: collection.immutable.Set[Int] =
-        bddAllSat.flatMap(clause => clause.zip(0 to (clause.length - 1)).filter(_._1 >= 0).map(_._2)).toSet
+    private def collectDistinctFeatureIds: collection.immutable.Set[Int] = FExprBuilder.synchronized {
+        var bddKnown: Set[BDD] = Set()
+        var bddTodo: Set[BDD] = Set(bdd)
+
+        while (!bddTodo.isEmpty) {
+            val bddnode = bddTodo.head
+            bddTodo = bddTodo.tail
+            bddKnown += bddnode
+
+            if (!(bddKnown contains bddnode.low()))
+                bddTodo += bddnode.low()
+            if (!(bddKnown contains bddnode.high()))
+                bddTodo += bddnode.high()
+        }
+        (bddKnown - FExprBuilder.TRUE - FExprBuilder.FALSE).map(_.`var`())
+    }
 
     def collectDistinctFeatures: Set[String] =
         collectDistinctFeatureIds.map(FExprBuilder lookupFeatureName _)
@@ -364,8 +379,8 @@ class BDDFeatureExpr(private[featureexpr] val bdd: BDD) extends FeatureExpr {
      * purposes
      */
     def countDistinctFeatures: Int = collectDistinctFeatureIds.size
-    def evaluate(selectedFeatures: Set[String]): Boolean = FExprBuilder.evalBdd(bdd, selectedFeatures)
-    def getConfIfSimpleAndExpr(): Option[(Set[SingleFeatureExpr], Set[SingleFeatureExpr])] = {
+    def evaluate(selectedFeatures: Set[String]): Boolean = FExprBuilder.synchronized {FExprBuilder.evalBdd(bdd, selectedFeatures)}
+    def getConfIfSimpleAndExpr(): Option[(Set[SingleFeatureExpr], Set[SingleFeatureExpr])] = FExprBuilder.synchronized {
         // this should be no simpleBDDFeatureExpr, because there the function is inherited from SingleFeatureExpr
         assert(!this.isInstanceOf[SingleFeatureExpr])
         var enabled: Set[SingleFeatureExpr] = Set()
@@ -396,7 +411,7 @@ class BDDFeatureExpr(private[featureexpr] val bdd: BDD) extends FeatureExpr {
         }
         return Some(enabled, disabled)
     }
-    def getConfIfSimpleOrExpr(): Option[(Set[SingleFeatureExpr], Set[SingleFeatureExpr])] = {
+    def getConfIfSimpleOrExpr(): Option[(Set[SingleFeatureExpr], Set[SingleFeatureExpr])] = FExprBuilder.synchronized {
         // this should be no simpleBDDFeatureExpr, because there the function is inherited from SingleFeatureExpr
         assert(!this.isInstanceOf[SingleFeatureExpr])
         var enabled: Set[SingleFeatureExpr] = Set()
@@ -456,14 +471,15 @@ private[bdd] object FExprBuilder {
     var bddVarNum = 100
     var maxFeatureId = 0
     //start with one, so we can distinguish -x and x for sat solving and tostring
+    System.setProperty("bdd", "j")
     var bddFactory: BDDFactory = null
     try {
-        bddFactory = BDDFactory.init("JDD", bddValNum, bddCacheSize)
+        bddFactory = BDDFactory.init("j", bddValNum, bddCacheSize)
     } catch {
         case e: OutOfMemoryError =>
             println("running with low memory. consider increasing heap size.")
             bddValNum = 524288
-            bddFactory = BDDFactory.init("JDD", bddValNum, bddCacheSize)
+            bddFactory = BDDFactory.init("j", bddValNum, bddCacheSize)
     }
     bddFactory.setIncreaseFactor(2) //200% increase each time
     bddFactory.setMaxIncrease(0) //no upper limit on increase size
@@ -478,16 +494,16 @@ private[bdd] object FExprBuilder {
     private val featureBDDs: Map[Int, BDD] = Map()
 
 
-    def and(a: BDDFeatureExpr, b: BDDFeatureExpr): BDDFeatureExpr = new BDDFeatureExpr(a.bdd and b.bdd)
-    def or(a: BDDFeatureExpr, b: BDDFeatureExpr): BDDFeatureExpr = new BDDFeatureExpr(a.bdd or b.bdd)
-    def imp(a: BDDFeatureExpr, b: BDDFeatureExpr): BDDFeatureExpr = new BDDFeatureExpr(a.bdd imp b.bdd)
-    def biimp(a: BDDFeatureExpr, b: BDDFeatureExpr): BDDFeatureExpr = new BDDFeatureExpr(a.bdd biimp b.bdd)
-    def xor(a: BDDFeatureExpr, b: BDDFeatureExpr): BDDFeatureExpr = new BDDFeatureExpr(a.bdd xor b.bdd)
-    def unique(a: BDDFeatureExpr, b: SingleBDDFeatureExpr): BDDFeatureExpr = new BDDFeatureExpr(a.bdd.unique(b.bdd))
+    def and(a: BDDFeatureExpr, b: BDDFeatureExpr): BDDFeatureExpr = this.synchronized {new BDDFeatureExpr(a.bdd and b.bdd)}
+    def or(a: BDDFeatureExpr, b: BDDFeatureExpr): BDDFeatureExpr = this.synchronized {new BDDFeatureExpr(a.bdd or b.bdd)}
+    def imp(a: BDDFeatureExpr, b: BDDFeatureExpr): BDDFeatureExpr = this.synchronized {new BDDFeatureExpr(a.bdd imp b.bdd)}
+    def biimp(a: BDDFeatureExpr, b: BDDFeatureExpr): BDDFeatureExpr = this.synchronized {new BDDFeatureExpr(a.bdd biimp b.bdd)}
+    def xor(a: BDDFeatureExpr, b: BDDFeatureExpr): BDDFeatureExpr = this.synchronized {new BDDFeatureExpr(a.bdd xor b.bdd)}
+    def unique(a: BDDFeatureExpr, b: SingleBDDFeatureExpr): BDDFeatureExpr = this.synchronized {new BDDFeatureExpr(a.bdd.unique(b.bdd))}
 
-    def not(a: BDDFeatureExpr): BDDFeatureExpr = new BDDFeatureExpr(a.bdd.not())
+    def not(a: BDDFeatureExpr): BDDFeatureExpr = this.synchronized {new BDDFeatureExpr(a.bdd.not())}
 
-    def definedExternal(name: String): SingleBDDFeatureExpr = {
+    def definedExternal(name: String): SingleBDDFeatureExpr = this.synchronized {
         val id: Int = featureIds.get(name) match {
             case Some(id) => id
             case _ =>

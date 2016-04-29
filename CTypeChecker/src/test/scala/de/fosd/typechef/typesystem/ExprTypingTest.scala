@@ -1,16 +1,15 @@
 package de.fosd.typechef.typesystem
 
 
-import org.junit.runner.RunWith
-import org.scalatest.junit.JUnitRunner
-import org.scalatest.matchers.ShouldMatchers
-import org.scalatest.FunSuite
+import de.fosd.typechef.conditional._
 import de.fosd.typechef.featureexpr.FeatureExprFactory.True
 import de.fosd.typechef.parser.c.{Id, TestHelper}
-import de.fosd.typechef.conditional._
+import org.junit.runner.RunWith
+import org.scalatest.junit.JUnitRunner
+import org.scalatest.{FunSuite, Matchers}
 
 @RunWith(classOf[JUnitRunner])
-class ExprTypingTest extends CTypeSystem with CEnv with FunSuite with ShouldMatchers with TestHelper {
+class ExprTypingTest extends FunSuite with CTypeSystem with CEnv with Matchers with TestHelper {
 
     val _i: Conditional[CType] = One(CSigned(CInt()))
     val _l: Conditional[CType] = One(CSigned(CLong()))
@@ -29,7 +28,7 @@ class ExprTypingTest extends CTypeSystem with CEnv with FunSuite with ShouldMatc
         val ast = parseExpr(code)
         val env = EmptyEnv.updateVarEnv(varCtx).updateStructEnv(astructEnv)
         val r = getExprType(ast, True, env)
-        println(ast + " --> " + r)
+//        println(ast + " --> " + r)
         r
     }
 
@@ -43,6 +42,7 @@ class ExprTypingTest extends CTypeSystem with CEnv with FunSuite with ShouldMatc
     val varCtx: VarTypingContext =
         new VarTypingContext() ++ (Seq(
             ("a", True, CDouble()),
+            ("u", True, CUnsigned(CInt())),
             ("i", True, CSigned(CInt())),
             ("ca", fa, CDouble()),
             ("v", True, CVoid()),
@@ -75,10 +75,11 @@ class ExprTypingTest extends CTypeSystem with CEnv with FunSuite with ShouldMatc
     test("primitives and pointers") {
         expr("0") should be(CZero().toCType)
         expr("'\\0'") should be(CZero().toCType)
+        expr("0x0000") should be(CZero().toCType)
         expr("1") should be(CSigned(CInt()).toCType)
         expr("blub") should be(CUnknown().toCType)
         expr("a") should be(CDouble().toCType.toObj)
-        expr("\"a\"") should be(CPointer(CSignUnspecified(CChar())).toCType)
+        expr("\"a\"") should be(CPointer(CSignUnspecified(CChar())).toCType.toObj)
         expr("'0'") should be(CSignUnspecified(CChar()).toCType)
         expr("&a") should be(CPointer(CDouble()).toCType.toObj)
         expr("*(&a)") should be(CDouble().toCType.toObj)
@@ -115,6 +116,9 @@ class ExprTypingTest extends CTypeSystem with CEnv with FunSuite with ShouldMatc
         expr("(double)3") should be(CDouble().toCType)
         expr("(void*)foo") should be(CPointer(CVoid()).toCType)
         expr("(int(*)())foo") should be(CPointer(CFunction(List(), CSigned(CInt()))).toCType)
+        expr("(struct str)u") should be(CUnknown().toCType)
+        expr("(struct str)s") should be(CStruct("str").toCType)
+        expr("(struct b)s") should be(CUnknown().toCType)
     }
 
 
@@ -204,7 +208,7 @@ class ExprTypingTest extends CTypeSystem with CEnv with FunSuite with ShouldMatc
                     #ifdef X
                     2;
                     #endif
-                    })""") should be(Choice(fx, _i, One(CPointer(CSignUnspecified(CChar())).toCType)))
+                    })""") should be(Choice(fx, _i, One(CPointer(CSignUnspecified(CChar())).toCType.toObj)))
     }
 
     test("arrays") {
@@ -228,6 +232,11 @@ class ExprTypingTest extends CTypeSystem with CEnv with FunSuite with ShouldMatc
         expr("&ig") should be(CPointer(CIgnore()).toCType.toObj)
         expr("*ig") should be(CIgnore().toCType.toObj)
         expr("(double)ig") should be(CDouble().toCType)
+    }
+
+    test("case of anonymous structs") {
+        //false positive in busybox
+        expr("((union { int __in; int __i; }) { .__in =1 }).__i") should be (CSigned(CInt()).toCType.toObj)
     }
 
     //    @Ignore

@@ -1,16 +1,15 @@
 package de.fosd.typechef.typesystem
 
 
-import org.junit.runner.RunWith
-import org.scalatest.FunSuite
-import org.scalatest.junit.JUnitRunner
-import org.scalatest.matchers.ShouldMatchers
-import de.fosd.typechef.parser.c.TestHelper
 import de.fosd.typechef.conditional._
 import de.fosd.typechef.featureexpr.FeatureExprFactory
+import de.fosd.typechef.parser.c.TestHelper
+import org.junit.runner.RunWith
+import org.scalatest.junit.JUnitRunner
+import org.scalatest.{FunSuite, Matchers}
 
 @RunWith(classOf[JUnitRunner])
-class ChoiceTypesTest extends FunSuite with ShouldMatchers with CTypeSystem with CEnvCache with TestHelper {
+class ChoiceTypesTest extends FunSuite with Matchers with CTypeSystem with CEnvCache with TestHelper {
 
 
     test("alternatives in declarations") {
@@ -38,6 +37,12 @@ class ChoiceTypesTest extends FunSuite with ShouldMatchers with CTypeSystem with
          c
          #endif
          ;
+
+         #ifdef X
+         const
+         #endif
+         double y;
+
          int end;""")
         typecheckTranslationUnit(ast)
         val env = lookupEnv(ast.defs.last.entry).varEnv
@@ -45,6 +50,8 @@ class ChoiceTypesTest extends FunSuite with ShouldMatchers with CTypeSystem with
         env("a").map(_.atype) should be(Choice(fx.not, One(CDouble()), One(CSigned(CInt()))))
         env("x").map(_.atype) should be(Choice(fy, One(CDouble()), Choice(fx, One(CSigned(CInt())), One(CUndefined))))
         env("b").map(_.atype) should be(Choice(fx, One(CDouble()), One(CUndefined)))
+        env("y") should be(Choice(fx,
+            One(CType(CDouble(), false, false, true)), One(CType(CDouble(), false, false, false))))
     }
 
 
@@ -61,8 +68,8 @@ inline
 	local_bh_disable();
 }""")
         val env = checkTranslationUnit(ast, FeatureExprFactory.True, EmptyEnv).varEnv
-        println(env)
-        env("__rcu_read_lock_bh").map(_.atype) should be(One(CFunction(List(CVoid()), CVoid())))
+//        println(env)
+        env("__rcu_read_lock_bh").map(_.atype) should be(One(CFunction(List(), CVoid())))
     }
 
 

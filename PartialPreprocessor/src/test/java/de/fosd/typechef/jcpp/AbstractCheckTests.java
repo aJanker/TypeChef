@@ -9,6 +9,7 @@ import de.fosd.typechef.lexer.Feature;
 import de.fosd.typechef.lexer.FeatureExprLib;
 import de.fosd.typechef.lexer.LexerException;
 import de.fosd.typechef.lexer.LexerFrontend;
+import de.fosd.typechef.lexer.macrotable.MacroFilter;
 import org.junit.Assert;
 
 import java.io.*;
@@ -107,8 +108,28 @@ public class AbstractCheckTests {
                             + cleanedOutput);
                 }
             }
-            //expecting to find a token a specific number of times
-            if (line.startsWith("+")) {
+            //expecting to find a token a minimum number of times
+            if (line.startsWith("++")) {
+                int expected = Integer.parseInt(line.substring(2, 3));
+                int found = 0;
+                String substring = line.substring(4);
+
+                String content = cleanedOutput;
+                int idx = content.indexOf(substring);
+                while (idx >= 0) {
+                    found++;
+                    content = content.substring(idx + substring.length());
+                    idx = content.indexOf(substring);
+                }
+
+                if (expected > found) {
+                    failOutput(cleanedOutput);
+                    Assert.fail(substring + " found " + found
+                            + " times, but expected at least " + expected + " times\n"
+                            + content);
+                }
+            }            //expecting to find a token a specific number of times
+            else if (line.startsWith("+")) {
                 int expected = Integer.parseInt(line.substring(1, 2));
                 int found = 0;
                 String substring = line.substring(3);
@@ -175,7 +196,7 @@ public class AbstractCheckTests {
 
                 containsErrorCheck = true;
                 Assert.assertTrue(
-                        "Expected error IF " + expectedErrorCondition + ", but preprocessing succeeded unless " + errorCondition,
+                        "Expected error IF " + expectedErrorCondition + ", but preprocessing succeeded IF " + errorCondition.not(),
                         errorCondition.equivalentTo(expectedErrorCondition));
             }
             if (line.trim().equals("print")) {
@@ -194,6 +215,10 @@ public class AbstractCheckTests {
 //        if (pp != null)
 //            pp.debugPreprocessorDone();
     }
+
+    protected boolean useXtc() { return false; }
+
+    protected MacroFilter useMacroFilter() { return new MacroFilter();  }
 
     private Conditional<LexerFrontend.LexerResult> lex(VALexer.LexerInput source, boolean debug, final String folder, final boolean ignoreWarnings)
             throws LexerException, IOException {
@@ -215,13 +240,24 @@ public class AbstractCheckTests {
 
             @Override
             public Set<Feature> getFeatures() {
-                Set<Feature> features = new HashSet<>();
+                Set<Feature> features = new HashSet<Feature>();
                 features.add(Feature.DIGRAPHS);
                 features.add(Feature.TRIGRAPHS);
                 features.add(Feature.LINEMARKERS);
                 features.add(Feature.GNUCEXTENSIONS);
                 return features;
             }
+
+            @Override
+            public boolean useXtcLexer() {
+                return useXtc();
+            }
+
+            @Override
+            public MacroFilter getMacroFilter() {
+                return useMacroFilter();
+            }
+
         }, true);
 
 

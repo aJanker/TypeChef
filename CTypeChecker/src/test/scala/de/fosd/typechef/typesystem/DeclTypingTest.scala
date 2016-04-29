@@ -1,22 +1,21 @@
 package de.fosd.typechef.typesystem
 
 
+import de.fosd.typechef.conditional._
+import de.fosd.typechef.featureexpr.FeatureExprFactory
+import de.fosd.typechef.parser.c.{Declaration, TestHelper}
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
-import org.scalatest.matchers.ShouldMatchers
-import org.scalatest.FunSuite
-import de.fosd.typechef.conditional._
-import de.fosd.typechef.parser.c.{Declaration, TestHelper}
-import de.fosd.typechef.featureexpr.FeatureExprFactory
+import org.scalatest.{FunSuite, Matchers}
 
 @RunWith(classOf[JUnitRunner])
-class DeclTypingTest extends CTypeSystem with FunSuite with ShouldMatchers with TestHelper {
+class DeclTypingTest extends FunSuite with CTypeSystem with Matchers with TestHelper {
 
 
     private def declTL(code: String) = {
         val ast: Declaration = parseDecl(code)
         val r = getDeclaredVariables(ast, FeatureExprFactory.True, EmptyEnv)._2.map(e => (e._1, e._4))
-        println(r)
+//        println(r)
         r
     }
 
@@ -50,6 +49,8 @@ class DeclTypingTest extends CTypeSystem with FunSuite with ShouldMatchers with 
         declT("unsigned long int a;") should be(CUnsigned(CLong()))
         declT("long a;") should be(CSigned(CLong()))
         declT("unsigned long a;") should be(CUnsigned(CLong()))
+        declT("__int128 a;") should be(CSigned(CInt128()))
+        declT("unsigned __int128 a;") should be(CUnsigned(CInt128()))
         declT("long long int a;") should be(CSigned(CLongLong()))
         declT("unsigned long long int a;") should be(CUnsigned(CLongLong()))
         declT("long long a;") should be(CSigned(CLongLong()))
@@ -141,6 +142,12 @@ class DeclTypingTest extends CTypeSystem with FunSuite with ShouldMatchers with 
         declCT("long \n#ifdef X\n*\n#endif\n#ifdef Y\n*\n#endif\n a;") should be(
             Choice(fy, Choice(fx, One(CPointer(CPointer(CSigned(CLong())))), One(CPointer(CSigned(CLong())))),
                 Choice(fx, One(CPointer(CSigned(CLong()))), One(CSigned(CLong())))))
+    }
+
+    val ui = CUnsigned(CInt()).toCType
+    test("attributes") {
+        declTL("unsigned int a, __attribute__((unused)) b;") should be(List(("a", One(ui)), ("b", One(ui))))
+
     }
 
 }

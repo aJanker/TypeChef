@@ -11,6 +11,7 @@ import org.apache.logging.log4j.LogManager
 
 import scala.collection.JavaConversions._
 import scala.collection.mutable.ListBuffer
+import scala.reflect.ClassTag
 
 
 /**
@@ -108,6 +109,9 @@ trait CDeclUse extends CDeclUseInterface with CEnv with CEnvCache {
             val cTypes = ConditionalLib.items(env.varEnv.lookupType(id.name)).filter { x =>
                 feature.equivalentTo(FeatureExprFactory.True) || feature.implies(x._1).isTautology()
             }
+        def isKnownFunctionInEnv(id : Id, env: Env) : Boolean =  {
+            val cTypes = env.varEnv.lookupType(id.name).toList.filter { x =>
+                feature.equivalentTo(FeatureExprFactory.True) || feature.implies(x._1).isTautology() }
 
             cTypes.map(_._2).exists {
                 case (CType(CFunction(_, _), _, _, _)) => true
@@ -178,6 +182,7 @@ trait CDeclUse extends CDeclUseInterface with CEnv with CEnvCache {
                             case k =>
                         }
                     })
+                case _ =>
             }
         }
     }
@@ -315,6 +320,7 @@ trait CDeclUse extends CDeclUseInterface with CEnv with CEnvCache {
                                     }
                                 case k =>
                             }
+                        case _ =>
                     })
                 case k =>
                     addUse(k, feature, env)
@@ -367,12 +373,14 @@ trait CDeclUse extends CDeclUseInterface with CEnv with CEnvCache {
                             offsetDesignators.foreach(x => x match {
                                 case Opt(ft, OffsetofMemberDesignatorID(offsetId: Id)) =>
                                     addStructUse(offsetId, ft, env, name.name, false)
+                                case _ =>
                             })
                         //addTypeUse(name, env, ft)
                         case Opt(ft, StructOrUnionSpecifier(isUnion, Some(i: Id), _, _, _)) =>
                             offsetDesignators.foreach(x => x match {
                                 case Opt(ft, OffsetofMemberDesignatorID(offsetId: Id)) =>
                                     addStructUse(offsetId, ft, env, offsetId.name, isUnion)
+                                case _ =>
                             })
                             addStructDeclUse(i, env, isUnion, ft)
                         case _ =>
@@ -407,12 +415,35 @@ trait CDeclUse extends CDeclUseInterface with CEnv with CEnvCache {
 
         for (Opt(f, osp) <- oldStyleParameters) {
             osp match {
-                case d: Declaration => d.init.foreach(decl => addOldStyleParameterDeclarator(decl.entry.getId, decl.feature, env))
+                case d: Declaration => d.init.foreach(decl => addOldStyleParameterDeclarator(decl.entry.getId, decl.condition, env))
                 case VarArgs() =>
                 case x =>
             }
         }
     }
+
+
+    private def conditionalToTuple[T <: Any](cond: Conditional[T], fexp: FeatureExpr = FeatureExprFactory.True): List[(FeatureExpr, T)] = {
+        cond match {
+            case One(a) if a.isInstanceOf[T] => List((fexp, a))
+            case Choice(ft, thenExpr, elseBranch) => conditionalToTuple(thenExpr, ft) ++ conditionalToTuple(elseBranch, ft.not())
+            case _ => List()
+        }
+    }
+
+    private def getFieldsForFeature(structEnv: StructEnv, structName: String, isUnion: Boolean, context: FeatureExpr): List[ConditionalTypeMap] = {
+        structEnv.getFields(structName, isUnion) match {
+            case One(x) =>
+                List(x)
+            case c@Choice(ft, thenBranch, elseBranch) =>
+                if (context.equivalentTo(FeatureExprFactory.True)) {
+                    conditionalToTuple(c).map(x => x._2)
+                } else {
+                    conditionalToTuple(c).filter(x => context.implies(x._1).isTautology()).map(x => x._2)
+                }
+        }
+    }
+
     override def addStructUse(entry: AST, featureExpr: FeatureExpr, env: Env, structName: String, isUnion: Boolean) {
         entry match {
             case i@Id(name) => {
@@ -527,11 +558,11 @@ trait CDeclUse extends CDeclUseInterface with CEnv with CEnvCache {
     private def addGotoStatements(f: AST) {
         val labelMap: IdentityHashMap[Id, FeatureExpr] = new IdentityHashMap()
 
-        def get[T](a: Any)(implicit m: ClassManifest[T]): List[Opt[T]] = {
+        def get[T](a: Any)(implicit m: ClassTag[T]): List[Opt[T]] = {
             a match {
                 // TODO: Feature does not have to be true
-                case c: One[T] if (m.erasure.isInstance(c.value)) => List(Opt(FeatureExprFactory.True, c.value))
-                case o: Opt[T] if (m.erasure.isInstance(o.entry)) => List(o)
+                case c: One[_] if (m.runtimeClass.isInstance(c.value)) => List(Opt(FeatureExprFactory.True, c.value.asInstanceOf[T]))
+                case o: Opt[_] if (m.runtimeClass.isInstance(o.entry)) => List(o.asInstanceOf[Opt[T]])
                 case l: List[_] => l.flatMap(x => get[T](x))
                 case p: Product => p.productIterator.toList.flatMap(x => get[T](x))
                 case _ => List()
@@ -540,12 +571,12 @@ trait CDeclUse extends CDeclUseInterface with CEnv with CEnvCache {
 
         get[LabelStatement](f).foreach(label => {
             putToDeclUseMap(label.entry.id)
-            labelMap.put(label.entry.id, label.feature)
+            labelMap.put(label.entry.id, label.condition)
         })
         get[GotoStatement](f).foreach(goto =>
             goto.entry.target match {
                 case usage@Id(name) => labelMap.keySet().toArray.foreach(declaration =>
-                    if (declaration.asInstanceOf[Id].name.equals(name) && (goto.feature.equivalentTo(FeatureExprFactory.True) || labelMap.get(declaration).and(goto.feature).isSatisfiable()))
+                    if (declaration.asInstanceOf[Id].name.equals(name) && (goto.condition.equivalentTo(FeatureExprFactory.True) || labelMap.get(declaration).implies(goto.condition).isTautology))
                         addToDeclUseMap(declaration.asInstanceOf[Id], usage))
                 case k => logger.error("Missing GotoStatement: " + k)
             })
@@ -554,11 +585,20 @@ trait CDeclUse extends CDeclUseInterface with CEnv with CEnvCache {
         if (decl.eq(use) && !declUseMap.containsKey(decl)) {
             putToDeclUseMap(decl)
         }
-
         if (declUseMap.containsKey(decl) && !declUseMap.get(decl).contains(use) && !decl.eq(use)) {
             declUseMap.get(decl).add(use)
             addToUseDeclMap(use, decl)
         }
+    }
+
+    // method recursively filters all AST elements for a given type T
+    // Copy / Pasted from ASTNavigation -> unable to include ASTNavigation because of dependencies
+    private def filterASTElements[T <: AST](a: Any)(implicit m: ClassTag[T]): List[T] = {
+        a match {
+            case p: Product if (m.runtimeClass.isInstance(p)) => List(p.asInstanceOf[T])
+            case l: List[_] => l.flatMap(filterASTElements[T])
+            case p: Product => p.productIterator.toList.flatMap(filterASTElements[T])
+            case _ => List()
     }
     private def putToDeclUseMap(decl: Id) = {
         if (!declUseMap.contains(decl)) {

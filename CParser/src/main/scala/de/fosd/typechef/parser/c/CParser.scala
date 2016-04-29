@@ -30,7 +30,7 @@ class CParser(featureModel: FeatureModel = null, debugOutput: Boolean = false) e
         "__complex__", "__const", "__const__", "__inline", "__inline__", "__restrict", "__restrict__",
         "__signed", "__signed__", "__typeof", "__typeof__", "__volatile", "__volatile__", "asm",
         "volatile", "typeof", "auto", "register", "typedef", "extern", "static", "inline",
-        "const", "volatile", "restrict", "char", "short", "int", "long", "float", "double",
+        "const", "volatile", "restrict", "char", "short", "int", "long", "__int128", "float", "double",
         "signed", "unsigned", "_Bool", "struct", "union", "enum", "if", "while", "do",
         "for", "goto", "continue", "break", "return", "case", "default", "else", "switch",
         "sizeof", "_Pragma", "__expectType", "__expectNotType", "__thread")
@@ -41,9 +41,7 @@ class CParser(featureModel: FeatureModel = null, debugOutput: Boolean = false) e
     }
 
     def externalList: MultiParser[List[Opt[ExternalDef]]] =
-        repOpt(externalDef, "externalDef") ^^ {
-            Conditional.flatten(_)
-        }
+        repOpt(externalDef, "externalDef") ^^ ConditionalLib.flatten
 
     def externalDef: MultiParser[Conditional[ExternalDef]] =
     // first part (with lookahead) only for error reporting, i.e.don 't try to parse anything else after a typedef
@@ -107,6 +105,7 @@ class CParser(featureModel: FeatureModel = null, debugOutput: Boolean = false) e
         | (textToken("short") ^^^ ShortSpecifier())
         | (textToken("int") ^^^ IntSpecifier())
         | (textToken("long") ^^^ LongSpecifier())
+        | (textToken("__int128") ^^^ Int128Specifier())
         | (textToken("float") ^^^ FloatSpecifier())
         | (textToken("double") ^^^ DoubleSpecifier())
         | signed
@@ -149,10 +148,10 @@ class CParser(featureModel: FeatureModel = null, debugOutput: Boolean = false) e
 
     private def structOrUnionSpecifierBody: MultiParser[(Option[Id], Option[List[Opt[StructDeclaration]]], List[Opt[AttributeSpecifier]])] =
     // XXX: PG: SEMI after LCURLY????
-        (ID ~~ LCURLY ~! (opt(SEMI) ~ structDeclarationList0 ~ RCURLY) ~ repOpt(attributeDecl) ^^ {
+        (ID ~~ LCURLY ~! (repOpt(SEMI) ~ structDeclarationList0 ~ RCURLY) ~ repOpt(attributeDecl) ^^ {
             case id ~ _ ~ (_ ~ list ~ _) ~ attr => (Some(id), Some(list), attr)
         }) |
-            (LCURLY ~ opt(SEMI) ~ structDeclarationList0 ~ RCURLY ~ repOpt(attributeDecl) ^^ {
+            (LCURLY ~ repOpt(SEMI) ~ structDeclarationList0 ~ RCURLY ~ repOpt(attributeDecl) ^^ {
                 case _ ~ _ ~ list ~ _ ~ attr => (None, Some(list), attr)
             }) |
             (ID ^^ {
@@ -211,10 +210,10 @@ class CParser(featureModel: FeatureModel = null, debugOutput: Boolean = false) e
     //consumes trailing comma <~ opt(COMMA)
 
     def initDecl: MultiParser[InitDeclarator] =
-        declarator ~ repOpt(attributeDecl) ~ opt((ASSIGN ~> initializer) | (COLON ~> expr)) ^^ {
-            case d ~ attr ~ Some(i: Initializer) => InitDeclaratorI(d, attr, Some(i));
-            case d ~ attr ~ Some(e: Expr) => InitDeclaratorE(d, attr, e);
-            case d ~ attr ~ None => InitDeclaratorI(d, attr, None);
+        repOpt(attributeDecl) ~ declarator ~ repOpt(attributeDecl) ~ opt((ASSIGN ~> initializer) | (COLON ~> expr)) ^^ {
+            case attr1 ~ d ~ attr2 ~ Some(i: Initializer) => InitDeclaratorI(d, attr1 ++ attr2, Some(i));
+            case attr1 ~ d ~ attr2 ~ Some(e: Expr) => InitDeclaratorE(d, attr1 ++ attr2, e);
+            case attr1 ~ d ~ attr2 ~ None => InitDeclaratorI(d, attr1 ++ attr2, None);
         }
 
     def pointerGroup0: MultiParser[List[Opt[Pointer]]] =
@@ -308,9 +307,7 @@ class CParser(featureModel: FeatureModel = null, debugOutput: Boolean = false) e
     //    private def compoundStatementCond: MultiParser[Conditional[CompoundStatement]] = compoundStatement ^^ {One(_)}
 
     def statementList: MultiParser[List[Opt[Statement]]] =
-        repOpt(compoundDeclaration | statement, "statement") ^^ {
-            Conditional.flatten(_)
-        }
+        repOpt(compoundDeclaration | statement, "statement") ^^ ConditionalLib.flatten
 
     def statement: MultiParser[Conditional[Statement]] = (SEMI ^^ {
         _ => EmptyStatement()
@@ -418,7 +415,7 @@ class CParser(featureModel: FeatureModel = null, debugOutput: Boolean = false) e
         }
 
     def castExpr: MultiParser[Expr] =
-        LPAREN ~~ typeName ~~ RPAREN ~~ (castExpr | lcurlyInitializer) ^^ {
+        LPAREN ~~ typeName ~~ RPAREN ~~ castExpr ^^ {
             case _ ~ t ~ _ ~ e => CastExpr(t, e)
         } | unaryExpr
 
@@ -545,6 +542,14 @@ class CParser(featureModel: FeatureModel = null, debugOutput: Boolean = false) e
             c => SimplePostfixSuffix(c.getText)
         })
     )
+
+    //see ISO 9899:1999 6.5.2
+    //postfix-expression:
+    //  ...
+    //  ( type-name ) { initializer-list }
+    //  ( type-name ) { initializer-list , }
+    private def castAndInitializer = (LPAREN ~> typeName <~ RPAREN) ~ lcurlyInitializer  ^^ { case tn~init => CastExpr(tn, init) }
+
     //
     def functionCall: MultiParser[FunctionCall] =
         LPAREN ~> opt(argExprList) <~ RPAREN ^^ {
@@ -553,7 +558,8 @@ class CParser(featureModel: FeatureModel = null, debugOutput: Boolean = false) e
         }
     //XXX allows trailing comma after argument list
 
-    def primaryExpr: MultiParser[Expr] = (textToken("__builtin_offsetof") ~ LPAREN ~! typeName ~ COMMA ~ offsetofMemberDesignator ~ RPAREN ^^ {
+    def primaryExpr: MultiParser[Expr] = castAndInitializer |
+        (textToken("__builtin_offsetof") ~ LPAREN ~! typeName ~ COMMA ~ offsetofMemberDesignator ~ RPAREN ^^ {
         case _ ~ _ ~ tn ~ _ ~ d ~ _ => BuiltinOffsetof(tn, d)
     }
         | (textToken("__builtin_types_compatible_p") ~ LPAREN ~ typeName ~ COMMA ~ typeName ~ RPAREN ^^ {
@@ -584,7 +590,7 @@ class CParser(featureModel: FeatureModel = null, debugOutput: Boolean = false) e
     def stringConst: MultiParser[StringLit] =
         (rep1(token("string literal", _.isString))
             ^^ {
-            (list: List[Opt[AbstractToken]]) => StringLit(list.map(o => Opt(o.feature, o.entry.getText)))
+            (list: List[Opt[AbstractToken]]) => StringLit(list.map(o => Opt(o.condition, o.entry.getText)))
         })
 
     def numConst: MultiParser[Constant] =

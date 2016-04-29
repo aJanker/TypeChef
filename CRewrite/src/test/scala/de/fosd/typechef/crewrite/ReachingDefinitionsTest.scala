@@ -1,13 +1,13 @@
 package de.fosd.typechef.crewrite
 
-import org.junit.Test
-import de.fosd.typechef.parser.c._
-import de.fosd.typechef.featureexpr.FeatureExprFactory
-import org.scalatest.matchers.ShouldMatchers
-import de.fosd.typechef.typesystem.{CDeclUse, CTypeSystemFrontend}
 import de.fosd.typechef.conditional.Opt
+import de.fosd.typechef.featureexpr.FeatureExprFactory
+import de.fosd.typechef.parser.c._
+import de.fosd.typechef.typesystem.{CDeclUse, CTypeSystemFrontend}
+import org.junit.Test
+import org.scalatest.Matchers
 
-class ReachingDefinitionsTest extends TestHelper with ShouldMatchers with IntraCFG with CFGHelper {
+class ReachingDefinitionsTest extends TestHelper with Matchers with IntraCFG with CFGHelper {
 
     private def runExample(code: String) {
         val a = parseFunctionDef(code)
@@ -19,7 +19,7 @@ class ReachingDefinitionsTest extends TestHelper with ShouldMatchers with IntraC
         assert(ts.checkASTSilent, "typecheck fails!")
         val udm = ts.getUseDeclMap
         val dum = ts.getDeclUseMap
-        val rd = new ReachingDefintions(env, dum, udm, FeatureExprFactory.empty, a)
+        val rd = new ReachingDefinitions(env, dum, udm, FeatureExprFactory.empty, a)
 
         for (s <- ss) {
             println(PrettyPrinter.print(s) + "  gen: " + rd.gen(s) + "   kill: " + rd.kill(s) +

@@ -1,16 +1,15 @@
 package de.fosd.typechef.parser.c
 
-import org.junit.runner.RunWith
-import org.scalatest.junit.JUnitRunner
-import org.scalatest.matchers.ShouldMatchers
-import de.fosd.typechef.featureexpr._
 import de.fosd.typechef.conditional._
 import de.fosd.typechef.featureexpr.FeatureExprFactory._
+import de.fosd.typechef.featureexpr._
 import org.junit.Ignore
-import org.scalatest.Suite
+import org.junit.runner.RunWith
+import org.scalatest.junit.JUnitRunner
+import org.scalatest.{Matchers, Suite}
 
 @RunWith(classOf[JUnitRunner])
-class ASTNavigationTest extends ShouldMatchers with ASTNavigation with ConditionalNavigation with EnforceTreeHelper with TestHelper with Suite{
+class ASTNavigationTest extends Matchers with ASTNavigation with ConditionalNavigation with EnforceTreeHelper with TestHelper with Suite{
 
 
     val ast = getAST("void foo() {}" +
@@ -77,7 +76,7 @@ class ASTNavigationTest extends ShouldMatchers with ASTNavigation with Condition
         val c4 = Choice(gc, stmt1, c3)
         val optc4 = Opt(gd, c4)
         val l = List[Opt[Statement]](optstmt0) ++
-            Conditional.flatten(List(optc4)) ++
+            ConditionalLib.flatten(List(optc4)) ++
             List[Opt[Statement]](optstmt6, optstmt7, optstmt8, optstmt9)
 
         val root = CompoundStatement(l)

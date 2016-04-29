@@ -1,11 +1,10 @@
 package de.fosd.typechef.crewrite
 
-import org.kiama.rewriting.Rewriter._
-
+import de.fosd.typechef.conditional.Opt
 import de.fosd.typechef.featureexpr.{FeatureExprFactory, FeatureModel}
 import de.fosd.typechef.parser.c._
 import de.fosd.typechef.typesystem._
-import de.fosd.typechef.conditional.Opt
+import org.kiama.rewriting.Rewriter._
 
 // https://www.securecoding.cert.org/confluence/display/seccode/ERR33-C.+Detect+and+handle+standard+library+errors
 // ERR33-C
@@ -26,7 +25,7 @@ import de.fosd.typechef.conditional.Opt
 // i  = ??
 // E  = {FunctionDef} // see MonotoneFW
 // F  = ??
-sealed abstract class StdLibFuncReturn(env: ASTEnv, dum: DeclUseMap, udm: UseDeclMap, fm: FeatureModel, f: FunctionDef) extends MonotoneFWIdLab(env, dum, udm, fm, f) with UsedDefinedDeclaredVariables {
+sealed abstract class StdLibFuncReturn(env: ASTEnv, dum: DeclUseMap, udm: UseDeclMap, fm: FeatureModel, f: FunctionDef) extends MonotoneFWIdLab(f, env, dum, udm, fm) with UsedDefinedDeclaredVariables {
     // list of standard library functions and their possible error returns
     // taken from above website
     val function: List[String]
@@ -36,7 +35,7 @@ sealed abstract class StdLibFuncReturn(env: ASTEnv, dum: DeclUseMap, udm: UseDec
         var res = l
 
         // we track variables with the return value of a stdlib function call that is in function
-        val retvar = manytd(query {
+        val retvar = manytd(query[AST] {
             case AssignExpr(i@Id(_), "=", source) => {
                 filterAllASTElems[PostfixExpr](source).map(
                     pfe => pfe match {
@@ -70,7 +69,7 @@ sealed abstract class StdLibFuncReturn(env: ASTEnv, dum: DeclUseMap, udm: UseDec
     def kill(a: AST): L = {
         var res = l
 
-        val checkvar = manytd(query {
+        val checkvar = manytd(query[AST] {
             case NAryExpr(i: Id, others) => {
                 val existingerrchecks = errorreturn.flatMap {st => subtermIsPartOfTerm(st, others)}
                 val fexp = existingerrchecks.foldRight(FeatureExprFactory.False) {(x, y) => env.featureExpr(x) or y}
@@ -89,7 +88,7 @@ sealed abstract class StdLibFuncReturn(env: ASTEnv, dum: DeclUseMap, udm: UseDec
     // DeclarationStatement
     def checkForPotentialCalls(a: AST): List[Id] = {
         var potentialfcalls: List[Id] = List()
-        val getfcalls = manytd(query {
+        val getfcalls = manytd(query[AST] {
             case PostfixExpr(i@Id(name), FunctionCall(_)) => {
                 // the function call is in our list of function calls we track
                 // and the call is not part of an AssignExpr or InitDeclarator, which will be handled with
@@ -138,6 +137,7 @@ sealed abstract class StdLibFuncReturn(env: ASTEnv, dum: DeclUseMap, udm: UseDec
     protected def combinationOperator(l1: L, l2: L) = union(l1, l2)
 
     protected def isForward = true
+
 }
 
 class StdLibFuncReturn_Null(env: ASTEnv, dum: UseDeclMap, udm: UseDeclMap, fm: FeatureModel, f: FunctionDef) extends StdLibFuncReturn(env, dum, udm, fm, f) {
@@ -180,9 +180,10 @@ class StdLibFuncReturn_Null(env: ASTEnv, dum: UseDeclMap, udm: UseDeclMap, fm: F
         Constant("0"),
         // ((void*)0)
         CastExpr(TypeName(List(Opt(FeatureExprFactory.True, VoidSpecifier())),
-            Some(AtomicAbstractDeclarator(List(Opt(FeatureExprFactory.True, Pointer(List()))), List()))), Constant("0")))
+            Some(AtomicAbstractDeclarator(List(Opt(FeatureExprFactory.True, Pointer(List()))),List()))),Constant("0")))
 
     solve()
+
 }
 
 class StdLibFuncReturn_EOF(env: ASTEnv, dum: DeclUseMap, udm: UseDeclMap, fm: FeatureModel, f: FunctionDef) extends StdLibFuncReturn(env, dum, udm, fm, f) {

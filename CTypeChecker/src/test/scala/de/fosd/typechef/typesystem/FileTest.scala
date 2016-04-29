@@ -1,9 +1,10 @@
 package de.fosd.typechef.typesystem
 
-import org.junit._
-import java.io.{InputStream, FileNotFoundException}
-import de.fosd.typechef.parser.c.{TestHelper, TranslationUnit}
+import java.io.{FileNotFoundException, InputStream}
+
 import de.fosd.typechef.featureexpr.{FeatureExprFactory, FeatureModel}
+import de.fosd.typechef.parser.c.{TestHelper, TranslationUnit}
+import org.junit._
 
 class FileTest extends TestHelper {
 
@@ -22,7 +23,7 @@ class FileTest extends TestHelper {
         println("done. (" + (System.currentTimeMillis - parsed) + ")")
         r
     }
-    private def check(ast: TranslationUnit, featureModel: FeatureModel): Boolean = new CTypeSystemFrontend(ast, featureModel).checkAST()
+    private def check(ast: TranslationUnit, featureModel: FeatureModel): Boolean = new CTypeSystemFrontend(ast, featureModel).checkAST().filterNot(_.isWarning).isEmpty
 
     private def d(n: String) = FeatureExprFactory.createDefinedExternal(n)
 

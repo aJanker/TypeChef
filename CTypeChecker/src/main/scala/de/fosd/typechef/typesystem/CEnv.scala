@@ -118,9 +118,12 @@ trait CEnv {
             //overwrites complete tags in lower scopes, but has no effects otherwise
             val name = id.name
             val key = (name, isUnion)
+            val newTag = StructTag(false, emptyFields, scope, Some(id))
             val prevTag: Conditional[StructTag] = env.getOrElse(key, One(incompleteTag))
-            val newTag: Conditional[StructTag] = Choice(condition, One(StructTag(false, emptyFields, scope, Some(id))), One(incompleteTag))
-            val result = ConditionalLib.mapCombination(prevTag, newTag, (p: StructTag, n: StructTag) => if (n.scope > p.scope) n else p)
+            val result = prevTag.flatMap(p =>
+                if (scope > p.scope) Choice(condition, One(newTag), One(p))
+                else One(p)
+            ).simplify
             new StructEnv(env + (key -> result))
         }
 
@@ -145,13 +148,12 @@ trait CEnv {
         def getFields(name: String, isUnion: Boolean): Conditional[ConditionalTypeMap] = env.getOrElse((name, isUnion), One(incompleteTag)).map(_.fields)
         def someDefinition(name: String, isUnion: Boolean): Boolean = env contains(name, isUnion)
 
-        def someDefinition(name: String, isUnion: Boolean, feature: FeatureExpr): Boolean = {
-            (env contains(name, isUnion)) && env.get(name, isUnion).get.toList.exists(x => (x._1.equivalentTo(feature)) && (x._2.id != None))
-        }
+        /**
+         * looks up under which condition the struct/union is already defined
+         */
+        def whenHasDefinitionWithId(name: String, isUnion: Boolean) =
+            env.get(name, isUnion).map(_.when(_.id != None)).getOrElse(False)
 
-        def someImpliedDefinition(name: String, isUnion: Boolean, feature: FeatureExpr): Boolean = {
-            (env contains(name, isUnion)) && env.get(name, isUnion).get.toList.exists(x => (x._1.equivalentTo(FeatureExprFactory.True) || x._1.implies(feature).isTautology()) && (x._2.id != None))
-        }
 
         def getId(name: String, isUnion: Boolean): Conditional[Id] = {
             def extractId(entry: Conditional[StructTag]): Conditional[Id] = {

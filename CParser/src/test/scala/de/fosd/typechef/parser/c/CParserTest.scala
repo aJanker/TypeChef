@@ -432,11 +432,23 @@ class CParserTest extends TestHelper {
         assertParseable("struct a{ void x; int x:3+2,z:3;}", p.structOrUnionSpecifier)
         assertParseable("struct {  }", p.structOrUnionSpecifier)
         assertParseError("struct { void x }", p.structOrUnionSpecifier)
+        assertParseable("struct { void x; ; }", p.structOrUnionSpecifier)
+        assertParseable("struct { ; }", p.structOrUnionSpecifier)
+        assertParseable("struct { ; ; }", p.structOrUnionSpecifier)
     }
 
     @Test def testAsmExpr {
         assertParseable("asm ( 3+3);", p.asm_expr)
         assertParseable("asm volatile ( 3+3);", p.asm_expr)
+        assertParseable("""
+                 asm volatile("2: rdmsr ; xor %[err],%[err]\n"
+                       "1:\n\t"
+                       ".section .fixup,\"ax\"\n\t"
+                       "3:  mov %[fault],%[err] ; jmp 1b\n\t"
+                       ".previous\n\t"
+                       " .section __ex_table,\"a\"\n"
+                       : "c" (msr), [fault] "i" (-5))
+            """, p.expr)
     }
 
     @Test def testFunctionDef {
@@ -1164,6 +1176,16 @@ void bar() {
     }
 
     @Test
+    def test_nouveaudrivers {
+        assertParseableAST(
+            """
+              |struct nouveau_oclass *
+              |nv04_instmem_oclass = &(struct nouveau_instmem_impl) {}.base;
+            """.stripMargin, p.translationUnit)
+    }
+
+
+    @Test
     def test_forunsigned {
         //based on a problem in uclibc; only working with a newer C standard C99 or GNUC99
         //        assertParseableAST("""for (unsigned int t = 0; t < 16; ++t);""".stripMargin , p.statement)
@@ -1178,7 +1200,7 @@ void bar() {
         assert(f.isSatisfiable(), "False AST subtree: " + ast + " in " + orig)
         ast match {
             case Opt(g, e: Object) => assertNoDeadNodes(e, f and g, orig)
-            case c: Choice[_] => assertNoDeadNodes(c.thenBranch, f and c.feature, orig); assertNoDeadNodes(c.elseBranch, f andNot c.feature, orig)
+            case c: Choice[_] => assertNoDeadNodes(c.thenBranch, f and c.condition, orig); assertNoDeadNodes(c.elseBranch, f andNot c.condition, orig)
             case e: Product => for (c <- e.productIterator) assertNoDeadNodes(c, f, orig)
             case _ =>
         }

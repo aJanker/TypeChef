@@ -1,16 +1,19 @@
 
 package de.fosd.typechef.crewrite
 
-import de.fosd.typechef.featureexpr._
-import java.io.StringWriter
-import de.fosd.typechef.parser.c._
-import de.fosd.typechef.typesystem._
-import de.fosd.typechef.error.{Severity, TypeChefError}
-import de.fosd.typechef.parser.c.SwitchStatement
-import scala.Some
-import de.fosd.typechef.parser.c.FunctionDef
-import de.fosd.typechef.parser.c.TranslationUnit
+import java.io.{StringWriter, Writer}
+import java.util
+
 import de.fosd.typechef.conditional.Opt
+import de.fosd.typechef.error.{Severity, TypeChefError}
+import de.fosd.typechef.featureexpr._
+import de.fosd.typechef.featureexpr.bdd.BDDFeatureExpr
+import de.fosd.typechef.lexer.FeatureExprLib
+import de.fosd.typechef.parser.c.{FunctionDef, SwitchStatement, TranslationUnit, _}
+import de.fosd.typechef.typesystem._
+
+import scala.collection.JavaConversions._
+import scala.io.Source
 
 
 sealed abstract class CAnalysisFrontend(tunit: TranslationUnit) extends CFGHelper {
@@ -29,14 +32,14 @@ class CInterAnalysisFrontend(tunit: TranslationUnit, fm: FeatureModel = FeatureE
 
         def lookupFExpr(e: AST): FeatureExpr = e match {
             case o if env.isKnown(o) => env.featureExpr(o)
-            case e: ExternalDef => externalDefFExprs.get(e).getOrElse(FeatureExprFactory.True)
+            case e: ExternalDef => externalDefFExprs.getOrElse(e, FeatureExprFactory.True)
             case _ => FeatureExprFactory.True
         }
 
 
         for (f <- fdefs) {
             writer.writeMethodGraph(getAllSucc(f, env).map {
-                x => (x._1, x._2.distinct.filter {y => y.feature.isSatisfiable(fm)}) // filter duplicates and wrong succs
+                x => (x._1, x._2.distinct.filter { y => y.condition.isSatisfiable(fm) }) // filter duplicates and wrong succs
             }, lookupFExpr, f.declarator.getName)
         }
         writer.writeFooter()
@@ -48,37 +51,47 @@ class CInterAnalysisFrontend(tunit: TranslationUnit, fm: FeatureModel = FeatureE
 }
 
 // TODO: refactoring different dataflow analyses into a composite will reduce code: handling of invalid paths, error printing ...
-class CIntraAnalysisFrontend(tunit: TranslationUnit, ts: CTypeSystemFrontend with CDeclUse, fm: FeatureModel = FeatureExprFactory.empty) extends CAnalysisFrontend(tunit) with IntraCFG {
+class CIntraAnalysisFrontendF(tunit: TranslationUnit, ts: CTypeSystemFrontend with CDeclUse, fm: FeatureModel = FeatureExprFactory.empty) extends CAnalysisFrontend(tunit) with IntraCFG {
 
     private lazy val udm = ts.getUseDeclMap
     private lazy val dum = ts.getDeclUseMap
 
+    private def getDecls(key: Id): List[Id] = {
+        if (!udm.containsKey(key)) List(key)
+        else udm.get(key).filter { d => env.featureExpr(d) and env.featureExpr(key) isSatisfiable fm }
+    }
+
     private val fanalyze = fdefs.map {
-        x => (x, getAllSucc(x, env).filterNot {x => x._1.isInstanceOf[FunctionDef]})
+        x => (x, getAllSucc(x, env).filterNot { x => x._1.isInstanceOf[FunctionDef] })
     }
 
     var errors: List[TypeChefError] = List()
+    var errNodes: List[(TypeChefError, Opt[AST])] = List()
 
-    def deadStore(): Boolean = {
+    def calculateCFGEdgeDegree(simplifyFM: java.io.File): List[(CFGStmt, Int)] = {
+        val simplification = getSimplifcation(simplifyFM)
+        def getDegreeFromEdges(x: (FunctionDef, List[(AST, CFG)])) =
+            x._2.flatMap(entry =>
+                entry._2.map(cfgStmt =>
+                    (cfgStmt.entry, calculateInteractionDegree(cfgStmt.condition.asInstanceOf[BDDFeatureExpr], simplification))))
+
+        fanalyze.flatMap(getDegreeFromEdges)
+    }
+
+    def deadStore(): List[TypeChefError] = {
         val err = fanalyze.flatMap(deadStore)
 
-        if (err.isEmpty) {
-            println("No dead stores found!")
-        } else {
-            println(err.map(_.toString + "\n").reduce(_ + _))
-        }
         errors ++= err
-        err.isEmpty
+        err
     }
 
     private def deadStore(fa: (FunctionDef, List[(AST, List[Opt[AST]])])): List[TypeChefError] = {
         var err: List[TypeChefError] = List()
 
-        val df = new Liveness(fa._1, env, udm, FeatureExprFactory.empty)
+        val df = new Liveness(env, udm, FeatureExprFactory.empty, fa._1)
 
         val nss = fa._2.map(_._1)
 
-        println("analyzing " + fa._1.getName + " with " + nss.size + " cfg stmts and " + fa._2.map(_._2.size).sum + " succs")
 
         for (s <- nss) {
             for ((i, fi) <- df.kill(s)) {
@@ -87,39 +100,35 @@ class CIntraAnalysisFrontend(tunit: TranslationUnit, ts: CTypeSystemFrontend wit
                 // code such as "int a;" occurs frequently and issues an error
                 // we filter them out by checking the declaration use map for usages
                 if (dum.containsKey(i) && dum.get(i).size > 0) {}
-                else out.find {case (t, _) => t == i} match {
+                else out.find { case (t, _) => t == i } match {
                     case None => {
-                        var idecls = udm.get(i)
-                        if (idecls == null)
-                            idecls = List(i)
-                        if (idecls.exists(isPartOf(_, fa._1)))
+                        var idecls = getDecls(i)
+                        if (idecls.exists(isPartOf(_, fa._1))) {
                             err ::= new TypeChefError(Severity.Warning, fi, "warning: Variable " + i.name + " is a dead store!", i, "")
+                            errNodes ::=(err.last, Opt(env.featureExpr(i), i))
+                        }
                     }
                     case Some((x, z)) => {
-                        if (!z.isTautology(fm)) {
-                            var xdecls = udm.get(x)
-                            if (xdecls == null)
-                                xdecls = List(x)
-                            var idecls = udm.get(i)
-                            if (idecls == null)
-                                idecls = List(i)
+                        if (fi.implies(z).not().isSatisfiable(fm)) {
+                            val xdecls = getDecls(x)
+                            val idecls = getDecls(i)
                             for (ei <- idecls) {
                                 // with isPartOf we reduce the number of false positives, since we only check local variables and function parameters.
                                 // an assignment to a global variable might be used in another function
-                                if (isPartOf(ei, fa._1) && xdecls.exists(_.eq(ei)))
-                                    err ::= new TypeChefError(Severity.Warning, z.not(), "warning: Variable " + i.name + " is a dead store!", i, "")
+                                if (isPartOf(ei, fa._1) && xdecls.exists(_.eq(ei))) {
+                                    err ::= new TypeChefError(Severity.Warning, fi.and(z.not()), "warning: Variable " + i.name + " is a dead store!", i, "")
+                                    errNodes ::=(err.last, Opt(env.featureExpr(i), i))
+                                }
                             }
-
                         }
                     }
                 }
             }
         }
-
         err
     }
 
-    def doubleFree(): Boolean = {
+    def doubleFree(): List[TypeChefError] = {
         val casestudy = {
             tunit.getFile match {
                 case None => ""
@@ -133,19 +142,14 @@ class CIntraAnalysisFrontend(tunit: TranslationUnit, ts: CTypeSystemFrontend wit
 
         val err = fanalyze.flatMap(doubleFree(_, casestudy))
 
-        if (err.isEmpty) {
-            println("No double frees found!")
-        } else {
-            println(err.map(_.toString + "\n").reduce(_ + _))
-        }
-
         errors ++= err
-        err.isEmpty
+        err
     }
 
 
     private def doubleFree(fa: (FunctionDef, List[(AST, List[Opt[AST]])]), casestudy: String): List[TypeChefError] = {
         var err: List[TypeChefError] = List()
+        var errNode: List[AST] = List()
 
         val df = new DoubleFree(env, dum, udm, FeatureExprFactory.empty, fa._1, casestudy)
 
@@ -157,16 +161,12 @@ class CIntraAnalysisFrontend(tunit: TranslationUnit, ts: CTypeSystemFrontend wit
                 val in = df.in(s)
 
                 for (((i, _), h) <- in)
-                    g.find {case ((t, _), _) => t == i} match {
+                    g.find { case ((t, _), _) => t == i } match {
                         case None =>
                         case Some(((x, _), _)) => {
                             if (h.isSatisfiable(fm)) {
-                                var xdecls = udm.get(x)
-                                if (xdecls == null)
-                                    xdecls = List(x)
-                                var idecls = udm.get(i)
-                                if (idecls == null)
-                                    idecls = List(i)
+                                var xdecls = getDecls(x)
+                                var idecls = getDecls(i)
                                 for (ei <- idecls)
                                     if (xdecls.exists(_.eq(ei)))
                                         err ::= new TypeChefError(Severity.Warning, h, "warning: Variable " + x.name + " is freed multiple times!", x, "")
@@ -178,17 +178,11 @@ class CIntraAnalysisFrontend(tunit: TranslationUnit, ts: CTypeSystemFrontend wit
         err
     }
 
-    def uninitializedMemory(): Boolean = {
+    def uninitializedMemory(): List[TypeChefError] = {
         val err = fanalyze.flatMap(uninitializedMemory)
 
-        if (err.isEmpty) {
-            println("No usages of uninitialized memory found!")
-        } else {
-            println(err.map(_.toString + "\n").reduce(_ + _))
-        }
-
         errors ++= err
-        err.isEmpty
+        err
     }
 
 
@@ -198,52 +192,44 @@ class CIntraAnalysisFrontend(tunit: TranslationUnit, ts: CTypeSystemFrontend wit
         val um = new UninitializedMemory(env, dum, udm, FeatureExprFactory.empty, fa._1)
         val nss = fa._2.map(_._1).filterNot(x => x.isInstanceOf[FunctionDef])
 
+        val gen = um.gen(fa._1)
+        val kill = um.kill(fa._1)
+
         for (s <- nss) {
             val g = um.getRelevantIdUsages(s)
+
             if (g.size > 0) {
                 val in = um.in(s)
 
-                for (((i, _), h) <- in)
-                    g.find {case ((t, _), _) => t == i} match {
-                        case None =>
-                        case Some(((x, _), _)) => {
-                            if (h.isSatisfiable(fm)) {
-                                var xdecls = udm.get(x)
-                                if (xdecls == null)
-                                    xdecls = List(x)
-                                var idecls = udm.get(i)
-                                if (idecls == null)
-                                    idecls = List(i)
-                                for (ei <- idecls)
-                                    if (xdecls.exists(_.eq(ei)))
-                                        err ::= new TypeChefError(Severity.Warning, h, "warning: Variable " + x.name + " is used uninitialized!", x, "")
+                for (((i, _), h) <- in if h.isSatisfiable(fm))
+                    for (((x, _), _) <- g if x == i) {
+                        val xdecls = getDecls(x)
+                        val idecls = getDecls(i)
+                        for (ei <- idecls)
+                            if (xdecls.exists(_.eq(ei))) {
+                                err ::= new TypeChefError(Severity.Warning, h, "warning: Variable " + x.name + " is used uninitialized!", x, "")
+                                errNodes ::=(err.last, Opt(h, i))
                             }
-                        }
                     }
             }
         }
-
         err
     }
 
-    def xfree(): Boolean = {
+    def xfree(): List[TypeChefError] = {
         val err = fanalyze.flatMap(xfree)
 
-        if (err.isEmpty) {
-            println("No static allocated memory is freed!")
-        } else {
-            println(err.map(_.toString + "\n").reduce(_ + _))
-        }
+
 
         errors ++= err
-        err.isEmpty
+        err
     }
 
 
     private def xfree(fa: (FunctionDef, List[(AST, List[Opt[AST]])])): List[TypeChefError] = {
         var err: List[TypeChefError] = List()
 
-        val xf = new XFree(env, dum, udm, FeatureExprFactory.empty, fa._1, "")
+        val xf = new XFree(env, dum, udm, fa._1, FeatureExprFactory.empty, "")
         val nss = fa._2.map(_._1).filterNot(x => x.isInstanceOf[FunctionDef])
 
         for (s <- nss) {
@@ -256,13 +242,13 @@ class CIntraAnalysisFrontend(tunit: TranslationUnit, ts: CTypeSystemFrontend wit
                         case None =>
                         case Some(x) => {
                             if (h.isSatisfiable(fm)) {
-                                val xdecls = udm.get(x)
-                                var idecls = udm.get(i)
-                                if (idecls == null)
-                                    idecls = List(i)
+                                val xdecls = getDecls(x)
+                                var idecls = getDecls(i)
                                 for (ei <- idecls)
-                                    if (xdecls.exists(_.eq(ei)))
+                                    if (xdecls.exists(_.eq(ei))) {
                                         err ::= new TypeChefError(Severity.Warning, h, "warning: Variable " + x.name + " is freed although not dynamically allocted!", x, "")
+                                        errNodes ::=(err.last, Opt(h, x))
+                                    }
                             }
                         }
                     }
@@ -272,17 +258,11 @@ class CIntraAnalysisFrontend(tunit: TranslationUnit, ts: CTypeSystemFrontend wit
         err
     }
 
-    def danglingSwitchCode(): Boolean = {
-        val err = fanalyze.flatMap {x => danglingSwitchCode(x._1)}
-
-        if (err.isEmpty) {
-            println("No dangling code in switch statements found!")
-        } else {
-            println(err.map(_.toString + "\n").reduce(_ + _))
-        }
+    def danglingSwitchCode(): List[TypeChefError] = {
+        val err = fanalyze.flatMap { x => danglingSwitchCode(x._1) }
 
         errors ++= err
-        err.isEmpty
+        err
     }
 
 
@@ -292,76 +272,64 @@ class CIntraAnalysisFrontend(tunit: TranslationUnit, ts: CTypeSystemFrontend wit
 
         ss.flatMap(s => {
             ds.danglingSwitchCode(s).map(e => {
-                new TypeChefError(Severity.Warning, e.feature, "warning: switch statement has dangling code ", e.entry, "")
+                val currentError = new TypeChefError(Severity.Warning, e.feature, "warning: switch statement has dangling code ", e.entry, "")
+                errNodes ::=(currentError, Opt(e.feature, e.entry))
+                currentError
             })
 
         })
     }
 
-    def cfgInNonVoidFunc(): Boolean = {
+    def cfgInNonVoidFunc(): List[TypeChefError] = {
         val err = fanalyze.flatMap(cfgInNonVoidFunc)
 
-        if (err.isEmpty) {
-            println("Control flow in non-void functions always ends in return statements!")
-        } else {
-            println(err.map(_.toString + "\n").reduce(_ + _))
-        }
-
         errors ++= err
-        err.isEmpty
+        err
     }
 
     private def cfgInNonVoidFunc(fa: (FunctionDef, List[(AST, List[Opt[AST]])])): List[TypeChefError] = {
         val cf = new CFGInNonVoidFunc(env, ts)
 
         cf.cfgInNonVoidFunc(fa._1).map(
-            e => new TypeChefError(Severity.Warning, e.feature, "Control flow of non-void function ends here!", e.entry, "")
+            e => {
+                val currentError = new TypeChefError(Severity.Warning, e.feature, "Control flow of non-void function ends here!", e.entry, "")
+                errNodes ::=(currentError, Opt(e.feature, e.entry))
+                currentError
+            }
         )
     }
 
-    def caseTermination(): Boolean = {
+    def caseTermination(): List[TypeChefError] = {
         val err = fanalyze.flatMap(caseTermination)
-
-        if (err.isEmpty) {
-            println("Case statements with code are properly terminated with break statements!")
-        } else {
-            println(err.map(_.toString + "\n").reduce(_ + _))
-        }
-
         errors ++= err
-        err.isEmpty
+        err
     }
 
     private def caseTermination(fa: (FunctionDef, List[(AST, List[Opt[AST]])])): List[TypeChefError] = {
         val casestmts = filterAllASTElems[CaseStatement](fa._1)
-
         val ct = new CaseTermination(env)
 
         casestmts.filterNot(ct.isTerminating).map {
             x => {
-                new TypeChefError(Severity.Warning, env.featureExpr(x),
+                val currentError = new TypeChefError(Severity.Warning, env.featureExpr(x),
                     "Case statement is not terminated by a break!", x, "")
+                errNodes ::=(currentError, Opt(env.featureExpr(x), x))
+                currentError
             }
         }
     }
 
-    def stdLibFuncReturn(): Boolean = {
+    def stdLibFuncReturn(): List[TypeChefError] = {
         val err = fanalyze.flatMap(stdLibFuncReturn)
 
-        if (err.isEmpty) {
-            println("Return values of stdlib functions are properly checked for errors!")
-        } else {
-            println(err.map(_.toString + "\n").reduce(_ + _))
-        }
-
         errors ++= err
-        err.isEmpty
+        err
     }
 
     private def stdLibFuncReturn(fa: (FunctionDef, List[(AST, List[Opt[AST]])])): List[TypeChefError] = {
         var err: List[TypeChefError] = List()
         val cl: List[StdLibFuncReturn] = List(
-            //new StdLibFuncReturn_EOF(env, dum, udm, fm, fa._1),
+            //new StdLibFuncReturn_EOF(env, dum, udm, fm),
 
             new StdLibFuncReturn_Null(env, dum, udm, FeatureExprFactory.empty, fa._1)
         )
@@ -374,6 +342,7 @@ class CIntraAnalysisFrontend(tunit: TranslationUnit, ts: CTypeSystemFrontend wit
                 for (e <- cle.checkForPotentialCalls(s)) {
                     err ::= new TypeChefError(Severity.SecurityWarning, env.featureExpr(e), "Return value of " +
                         PrettyPrinter.print(e) + " is not properly checked for (" + errorvalues + ")!", e)
+                    errNodes ::=(err.last, Opt(env.featureExpr(e), e))
                 }
 
 
@@ -383,23 +352,19 @@ class CIntraAnalysisFrontend(tunit: TranslationUnit, ts: CTypeSystemFrontend wit
                 val g = cle.getUsedVariables(s)
                 val in = cle.in(s)
                 for (((e, _), fi) <- in) {
-                    println("s", PrettyPrinter.print(s), "in", in, "g", g, "u", cle.uses(s))
-                    g.find {case ((t, _), _) => t == e} match {
+                    g.find { case ((t, _), _) => t == e } match {
                         case None =>
                         case Some((k@(x, _), _)) => {
                             if (fi.isSatisfiable(fm)) {
-                                var xdecls = udm.get(x)
-                                if (xdecls == null)
-                                    xdecls = List(x)
-                                var edecls = udm.get(e)
-                                if (edecls == null)
-                                    edecls = List(e)
+                                var xdecls = getDecls(x)
+                                var edecls = getDecls(e)
 
                                 for (ee <- edecls) {
                                     val kills = cle.kill(s)
                                     if (xdecls.exists(_.eq(ee)) && !kills.contains(k)) {
                                         err ::= new TypeChefError(Severity.SecurityWarning, fi, "The value of " +
                                             PrettyPrinter.print(e) + " is not properly checked for (" + errorvalues + ")!", e)
+                                        errNodes ::=(err.last, Opt(env.featureExpr(e), e))
                                     }
                                 }
                             }
@@ -409,5 +374,146 @@ class CIntraAnalysisFrontend(tunit: TranslationUnit, ts: CTypeSystemFrontend wit
             }
         }
         err
+    }
+
+    private def getSimplifcation(simplifyFM: java.io.File) = (feature: BDDFeatureExpr) => {
+        if (simplifyFM == null) feature
+        else if (simplifyFM.getName.endsWith(".model")) {
+            val simplifyModel = FeatureToSimplifyModelMap.fill(simplifyFM)
+            val parser = new FeatureExprParser()
+            val simpleFM = feature.collectDistinctFeatureObjects.foldLeft(FeatureExprFactory.True)((f, s) => {
+                simplifyModel.get(s.feature) match {
+                    case Some(l) => l.foldLeft(f)(_ and parser.parse(_))
+                    case _ => f
+                }
+            })
+            feature.simplify(simpleFM).asInstanceOf[BDDFeatureExpr]
+        } else if (simplifyFM.getName.endsWith(".dimacs")) {
+            val simplifyModel = FeatureExprLib.featureModelFactory.createFromDimacsFile(Source.fromFile(simplifyFM))
+            // feature.simplify(simplifyModel).asInstanceOf[BDDFeatureExpr]
+            feature
+        } else {
+            val parser = new FeatureExprParser()
+            val simpleFM = Source.fromFile(simplifyFM).getLines.foldLeft(FeatureExprFactory.True)((f, l) => {
+                if (l.matches("\\s*")) f
+                else f and parser.parse(l)
+            })
+
+            feature.simplify(simpleFM).asInstanceOf[BDDFeatureExpr]
+        }
+    }
+
+    def getInteractionDegrees(simplifyFM: java.io.File): (List[(Opt[Statement], Int)],
+        List[(Int, TypeChefError)], List[(Opt[AST], Int, TypeChefError)]) = {
+        interactionDegrees(getSimplifcation(simplifyFM))
+    }
+
+    private def interactionDegrees(simplify: BDDFeatureExpr => BDDFeatureExpr): (List[(Opt[Statement], Int)],
+        List[(Int, TypeChefError)], List[(Opt[AST], Int, TypeChefError)]) = {
+        // calculate the interaction degree of each statement itself
+        val stmtsDegrees: List[(Opt[Statement], Int)] = filterAllASTElems[Statement](tunit).flatMap(stmt => {
+            val stmtFExpr = env.featureExpr(stmt).asInstanceOf[BDDFeatureExpr]
+
+            if (filterAllASTElems[Statement](stmt).size == 1)
+                Some((Opt(stmtFExpr, stmt), calculateInteractionDegree(stmtFExpr, simplify)))
+            else None
+        })
+
+        val warnDegrees: List[(Int, TypeChefError)] =
+            ts.checkAST(false).filter(Set(Severity.Warning, Severity.SecurityWarning) contains _.severity).flatMap(warning => {
+                val warnFEXpr = warning.condition.asInstanceOf[BDDFeatureExpr] //TODO add ast element
+                Some(calculateInteractionDegree(warnFEXpr, simplify), warning)
+            })
+
+        val errDegrees: List[(Opt[AST], Int, TypeChefError)] = errNodes.flatMap(node => {
+            val stmtFExpr = env.featureExpr(node._2.entry).asInstanceOf[BDDFeatureExpr]
+            Some((Opt(stmtFExpr, node._2.entry), calculateInteractionDegree(stmtFExpr, simplify), node._1))
+        })
+
+        (stmtsDegrees, warnDegrees, errDegrees)
+    }
+
+    def writeWarningDegrees(warnDegrees: List[(Int, TypeChefError)], writer: Writer) = {
+        warnDegrees.foreach(entry => {
+            writer.write(entry._1.toString)
+            writer.write(" \tFeature: ")
+            writer.write(entry._2.condition.toString)
+
+            writer.write(" \tError: ")
+            writer.write(entry._2.toString)
+            writer.write("\n==========\n")
+        })
+    }
+
+    def writeErrorDegrees(errorDegrees: List[(Opt[AST], Int, TypeChefError)], writer: Writer) = {
+        errorDegrees.foreach(entry => {
+            writeDegree((entry._1, entry._2), writer)
+            writer.write(" \tPriror Statement: ")
+            writer.write(findPriorASTElem[Statement](entry._1.entry, env) match {
+                case Some(x) => PrettyPrinter.print(x)
+                case None => "Non found. "
+            })
+            writer.write(" \tError: ")
+            writer.write(entry._3.toString)
+            writer.write("\n==========\n")
+        })
+    }
+
+    def writeStatementDegrees(stmtsDegrees: List[(Opt[Statement], Int)], writer: Writer) = {
+        stmtsDegrees.foreach(entry => {
+            writeDegree(entry, writer)
+            writer.write("\n==========\n")
+        })
+    }
+
+    def getErrorDegrees(errs: List[TypeChefError], simplifyFM: java.io.File): (List[(String, FeatureExpr, Int)], Map[Int, Int]) = {
+        val simplification = getSimplifcation(simplifyFM)
+
+        val singleErrDegrees = errs.map(
+            err => (PrettyPrinter.print(err.where.asInstanceOf[AST]) + " @ " + err.where.rangeClean, err.condition, calculateInteractionDegree(err.condition.asInstanceOf[BDDFeatureExpr], simplification)))
+        val degreeMap = singleErrDegrees.map(_._3).groupBy(identity).mapValues(_.size)
+
+        (singleErrDegrees, degreeMap)
+    }
+
+    def getAllDegrees(simplifyFM: java.io.File): Map[Int, Int] = {
+        val simplification = getSimplifcation(simplifyFM)
+
+        val stmtsDegrees: List[(Opt[Statement], Int)] = filterAllASTElems[Statement](tunit).flatMap(stmt => {
+            val stmtFExpr = env.featureExpr(stmt).asInstanceOf[BDDFeatureExpr]
+
+            if (filterAllASTElems[Statement](stmt).size == 1)
+                Some((Opt(stmtFExpr, stmt), calculateInteractionDegree(stmtFExpr, simplification)))
+            else None
+        })
+
+        /* val singleErrDegrees = stmtsDegrees.map(
+            stmt => (PrettyPrinter.print(stmt._1.entry) + " @ " + stmt._1.entry.rangeClean, stmt._1.condition, stmt._2)) */
+        val degreeMap = stmtsDegrees.map(_._2).groupBy(identity).mapValues(_.size)
+
+        degreeMap
+    }
+
+    private def writeDegree(stmtDegree: (Opt[AST], Int), writer: Writer) = {
+        writer.write(stmtDegree._2.toString)
+        writer.write(" \tFeature: ")
+        writer.write(stmtDegree._1.feature.toString)
+        writer.write(" \tStatment: ")
+        writer.write(PrettyPrinter.print(stmtDegree._1.entry))
+        writer.write(" \tAST: ")
+        writer.write(stmtDegree._1.entry.toString)
+    }
+
+    private def calculateInteractionDegree(fExpr: BDDFeatureExpr, simplify: BDDFeatureExpr => BDDFeatureExpr): Int = {
+        //interaction degree is the smallest number of variables that need to be set to reproduce the problem
+        //we use the shortest path in a BDD as simple way of computing this
+
+        //this does not always return the optimal solution, because variable ordering matters!
+        //for example (fa and fb) or (fa andNot fb and fc) or (fa.not and fb) will produce a result 2 instead of 1
+        val simpleFexpr = simplify(fExpr)
+        val allsat = simpleFexpr.leak().allsat().asInstanceOf[util.LinkedList[Array[Byte]]]
+
+        if (allsat.isEmpty) 0
+        else allsat.map(_.count(_ >= 0)).min
     }
 }

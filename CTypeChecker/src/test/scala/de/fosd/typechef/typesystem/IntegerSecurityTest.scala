@@ -1,14 +1,13 @@
 package de.fosd.typechef.typesystem
 
-import org.junit.runner.RunWith
-import org.scalatest.FunSuite
-import org.scalatest.junit.JUnitRunner
-import org.scalatest.matchers.ShouldMatchers
-import de.fosd.typechef.parser.c._
 import de.fosd.typechef.featureexpr.FeatureExprFactory
+import de.fosd.typechef.parser.c._
+import org.junit.runner.RunWith
+import org.scalatest.junit.JUnitRunner
+import org.scalatest.{FunSuite, Matchers}
 
 @RunWith(classOf[JUnitRunner])
-class IntegerSecurityTest extends FunSuite with ShouldMatchers with TestHelperTSConditional {
+class IntegerSecurityTest extends FunSuite with Matchers with TestHelperTSConditional {
 
 
     override protected def check(ast: TranslationUnit, enableAnalysis: Boolean): Boolean = {
@@ -18,7 +17,7 @@ class IntegerSecurityTest extends FunSuite with ShouldMatchers with TestHelperTS
                 override def warning_potential_integer_overflow = true
                 override def warning_implicit_coercion = true
             } else new LinuxDefaultOptions {})
-        frontend.checkAST(false)
+        frontend.makeSilent().checkAST(false).isEmpty
     }
 
 

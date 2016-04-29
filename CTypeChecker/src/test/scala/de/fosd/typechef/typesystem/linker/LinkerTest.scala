@@ -1,16 +1,15 @@
 package de.fosd.typechef.typesystem.linker
 
 
-import org.junit.runner.RunWith
-import org.scalatest.FunSuite
-import org.scalatest.junit.JUnitRunner
-import org.scalatest.matchers.ShouldMatchers
+import de.fosd.typechef.featureexpr.FeatureExprFactory.{False, True}
 import de.fosd.typechef.parser.c._
-import de.fosd.typechef.featureexpr.FeatureExprFactory.{True, False}
-import de.fosd.typechef.typesystem.{CVoid, CFunction, CFloat}
+import de.fosd.typechef.typesystem.{CFloat, CFunction, CVoid}
+import org.junit.runner.RunWith
+import org.scalatest.junit.JUnitRunner
+import org.scalatest.{FunSuite, Matchers}
 
 @RunWith(classOf[JUnitRunner])
-class LinkerTest extends FunSuite with ShouldMatchers with TestHelper {
+class LinkerTest extends FunSuite with Matchers with TestHelper {
 
     val tfun = CFunction(Seq(), CVoid()) // () -> void
     val tfun2 = CFunction(Seq(CFloat()), CVoid()) // float -> void
@@ -83,7 +82,7 @@ class LinkerTest extends FunSuite with ShouldMatchers with TestHelper {
 
         (idb isCompatibleTo iinmem) should be(true)
         (iperist isCompatibleTo iinmem) should be(false)
-        println((iperist.conditional(fa) link iinmem))
+//        println((iperist.conditional(fa) link iinmem))
         ((iperist.conditional(fa) link iinmem).featureModel implies fa.not).isTautology should be(true)
         (iperist.conditional(fa) isCompatibleTo iinmem.conditional(fb)) should be(true)
         (idb link iinmem).isComplete() should be(true)
@@ -94,7 +93,7 @@ class LinkerTest extends FunSuite with ShouldMatchers with TestHelper {
 
         ifull.isComplete() should be(true)
         ifull.isFullyConfigured() should be(false)
-        println(ifull)
+//        println(ifull)
     }
 
     test("module compatibility") {

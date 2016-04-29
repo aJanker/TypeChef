@@ -1,33 +1,22 @@
 package de.fosd.typechef.typesystem
 
 
-import org.junit.runner.RunWith
-import org.scalatest.FunSuite
-import org.scalatest.junit.JUnitRunner
-import org.scalatest.matchers.ShouldMatchers
 import de.fosd.typechef.parser.c._
+import org.junit.runner.RunWith
+import org.scalatest.{Matchers, FunSuite}
+import org.scalatest.junit.JUnitRunner
 
 @RunWith(classOf[JUnitRunner])
-class TypeSignatureTest extends FunSuite with ShouldMatchers with TestHelper {
+class TypeSignatureTest extends FunSuite with Matchers with TestHelperTS {
 
-    private def check(code: String, printAST: Boolean = false): Boolean = {
-        println("checking " + code);
-        if (printAST) println("AST: " + getAST(code));
-        check(getAST(code));
-    }
-
-    private def check(ast: TranslationUnit): Boolean = {
-        assert(ast != null, "void ast");
-        new CTypeSystemFrontend(ast).checkAST()
-    }
 
 
     test("typdef types") {
-        expectResult(true) {
+        assertResult(true) {
             check("typedef int a;\n" +
                 "void foo(){a b;}")
         }
-        expectResult(false) {
+        assertResult(false) {
             check("#ifdef X\n" +
                 "typedef int a;\n" +
                 "#endif\n" +

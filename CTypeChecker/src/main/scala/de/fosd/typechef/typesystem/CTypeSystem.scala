@@ -1,9 +1,9 @@
 package de.fosd.typechef.typesystem
 
-import _root_.de.fosd.typechef.featureexpr._
-import _root_.de.fosd.typechef.conditional._
-import _root_.de.fosd.typechef.parser.c._
+import de.fosd.typechef.conditional._
 import de.fosd.typechef.error._
+import de.fosd.typechef.featureexpr._
+import de.fosd.typechef.parser.c._
 
 /**
  * checks an AST (from CParser) for type errors (especially dangling references)
@@ -50,12 +50,13 @@ trait CTypeSystem extends CTypes with CEnv with CDeclTyping with CTypeEnv with C
     }
 
 
+
     private def checkFunction(f: CDef, specifiers: List[Opt[Specifier]], declarator: Declarator, oldStyleParameters: List[Opt[OldParameterDeclaration]], stmt: CompoundStatement, featureExpr: FeatureExpr, env: Env): (Conditional[CType], Env) = {
         val oldStyleParam = getOldStyleParameters(oldStyleParameters, featureExpr, env)
         val funType = getFunctionType(specifiers, declarator, oldStyleParam, featureExpr, env).simplify(featureExpr)
 
         //structs in signature defined?
-        funType.mapf(featureExpr, (f, t) => t.atype match {
+        funType.vmap(featureExpr, (f, t) => t.atype match {
             case CFunction(params, ret) =>
                 //structs in both return type and parameters must be complete
                 checkStructCompleteness(ret, f, env, declarator)
@@ -64,12 +65,14 @@ trait CTypeSystem extends CTypes with CEnv with CDeclTyping with CTypeEnv with C
                 issueTypeError(Severity.Crash, f, "not a function", declarator)
         })
 
-        val expectedReturnType: Conditional[CType] = funType.mapf(featureExpr, {
+        val expectedReturnType: Conditional[CType] = funType.vmap(featureExpr, {
             case (f, CType(CFunction(_, returnType), _, _, _)) => returnType
             case (f, other) => reportTypeError(f, "not a function type: " + other, declarator, Severity.Crash).toCType
         }).simplify(featureExpr)
 
         val kind = KDefinition
+
+        checkVoidParameter(funType, featureExpr, f)
 
         //redeclaration?
         checkRedeclaration(declarator.getName, funType, featureExpr, env, declarator, kind)
@@ -83,7 +86,9 @@ trait CTypeSystem extends CTypes with CEnv with CDeclTyping with CTypeEnv with C
         addJumpStatements(stmt)
 
         //check body (add parameters to environment)
-        val innerEnv = newEnv.addVars(parameterTypes(declarator, featureExpr, newEnv.incScope(), oldStyleParam), KParameter, newEnv.scope + 1, NoLinkage).setExpectedReturnType(expectedReturnType)
+        val params = parameterTypes(declarator, featureExpr, newEnv.incScope(), oldStyleParam)
+        params.map(p=> checkVoidVariable(p._4, p._2, p._3))
+        val innerEnv = newEnv.addVars(params, KParameter, newEnv.scope + 1, NoLinkage).setExpectedReturnType(expectedReturnType)
         getStmtType(stmt, featureExpr, innerEnv) //ignore changed environment, to enforce scoping!
         checkTypeFunction(specifiers, declarator, oldStyleParameters, featureExpr, env)
         addOldStyleParameters(oldStyleParameters, declarator, featureExpr, env)
@@ -101,11 +106,11 @@ trait CTypeSystem extends CTypes with CEnv with CDeclTyping with CTypeEnv with C
 
         val prevTypes: Conditional[(CType, DeclarationKind, Int, Linkage)] = env.varEnv.lookup(name)
 
-        ConditionalLib.mapCombinationF(ctype, prevTypes, fexpr, (f: FeatureExpr, newType: CType, prev: (CType, DeclarationKind, Int, Linkage)) => {
+        ConditionalLib.vmapCombinationOp(ctype, prevTypes, fexpr, (f: FeatureExpr, newType: CType, prev: (CType, DeclarationKind, Int, Linkage)) => {
             if (!isValidRedeclaration(normalize(newType), kind, env.scope, normalize(prev._1), prev._2, prev._3))
                 reportTypeError(f, "Invalid redeclaration/redefinition of " + name +
-                    " (was: " + prev._1 + ":" + kind + ":" + env.scope +
-                    ", now: " + newType + ":" + prev._2 + ":" + prev._3 + ")",
+                    " (was: " + prev._1.toText + ":" + kind + ":" + env.scope +
+                    ", now: " + newType.toText + ":" + prev._2 + ":" + prev._3 + ")",
                     where, Severity.RedeclarationError)
         })
     }
@@ -124,14 +129,15 @@ trait CTypeSystem extends CTypes with CEnv with CDeclTyping with CTypeEnv with C
             case (a, b) if containsIgnore(a) || containsIgnore(b) => return true
 
             //two prototypes
-            case (CPointer(CFunction(newParam, newRet)), CPointer(CFunction(prevParam, prevRet))) if (newKind == KDeclaration && prevKind == KDeclaration) =>
+            case (CPointer(CFunction(newParam, newRet)), CPointer(CFunction(prevParam, prevRet))) if newKind == KDeclaration && prevKind == KDeclaration =>
                 //must have same return type and same parameters (for common parameters)
-                return (newRet == prevRet) && (newParam.zip(prevParam).forall(x => x._1 == x._2))
+                //exception: may redefine function that was previously declared without parameters (technically also without an unnamed void parameter, but we cannot distinguish this here)
+                return (newRet equalsWithConst prevRet) && (newParam.length==prevParam.length || prevParam.length==0) && newParam.zip(prevParam).forall(x => x._1 equalsAType x._2)
 
             //function overriding a prototype or vice versa
-            case (CPointer(CFunction(newParam, newRet)), CPointer(CFunction(prevParam, prevRet))) if ((newKind == KDefinition && prevKind == KDeclaration) || (newKind == KDeclaration && prevKind == KDefinition)) =>
-                //must have the exact same atype (ignoring const, volatile and object)
-                return newType.atype == prevType.atype
+            case (CPointer(CFunction(newParam, newRet)), CPointer(CFunction(prevParam, prevRet))) if (newKind == KDefinition && prevKind == KDeclaration) || (newKind == KDeclaration && prevKind == KDefinition) =>
+                //must have the exact same atype (ignoring const, volatile and object); return type must also match for const
+                return (newType.atype == prevType.atype) && (newRet equalsWithConst prevRet)
 
             case _ =>
         }
@@ -141,14 +147,17 @@ trait CTypeSystem extends CTypes with CEnv with CDeclTyping with CTypeEnv with C
         //for now, simple approximation here: if either the old or the new variable is not initialized, we are fine (that does not account for internal linkage etc but okay)
         //global variables
         if (newScope == 0 && prevScope == 0 && (newKind == KDeclaration || prevKind == KDeclaration)) {
-            //valid if exact same type
-            return newType.toValue == prevType.toValue
+            //valid if exact same type (except for object status)
+            return newType equalsWithConstAndVolatile prevType
         }
 
         //local variables (scope>0) may never be redeclared
         //function definitions may never be redeclared
         false
     }
+
+
+
 
     private def isEqualOrIgnore(a: CType, b: CType): Boolean =
         (a == b) || a.isIgnore || b.isIgnore
@@ -158,15 +167,19 @@ trait CTypeSystem extends CTypes with CEnv with CDeclTyping with CTypeEnv with C
         case CPointer(p) => containsIgnore(p)
         case CArray(p, _) => containsIgnore(p)
         case CFunction(p, r) => containsIgnore(r) || p.exists(containsIgnore(_))
-        case CAnonymousStruct(f, _) => f.allTypes.exists(_.exists(containsIgnore(_)))
+        case CAnonymousStruct(_, f, _) => f.allTypes.exists(_.exists(containsIgnore(_)))
         case _ => false
     })
 
     private def checkInitializer(initExpr: Expr, expectedType: Conditional[CType], featureExpr: FeatureExpr, env: Env) {
         val foundType = getExprType(initExpr, featureExpr, env)
-        ConditionalLib.mapCombinationF(foundType, expectedType, featureExpr, {
-            (f, ft: CType, et: CType) => if (f.isSatisfiable() && !coerce(et, ft) && !ft.isUnknown)
-                issueTypeError(Severity.OtherError, f, "incorrect initializer type. expected " + et + " found " + ft, initExpr)
+        ConditionalLib.vmapCombinationOp(foundType, expectedType, featureExpr, {
+            (f, ft: CType, et: CType) =>
+                val c = coerce(et, ft)
+                if (f.isSatisfiable() && c == None && !ft.isUnknown)
+                    issueTypeError(Severity.OtherError, f, "incorrect initializer type. expected " + et + " found " + ft, initExpr)
+                if (f.isSatisfiable() && c.isDefined && !c.get.isEmpty && !ft.isUnknown)
+                    issueTypeError(Severity.Warning, f, c.get + "(incorrect initializer type; expected " + et + " found " + ft+")", initExpr)
         })
     }
 
@@ -223,13 +236,13 @@ trait CTypeSystem extends CTypes with CEnv with CDeclTyping with CTypeEnv with C
     def getStmtType(stmt: Statement, featureExpr: FeatureExpr, env: Env): (Conditional[CType], Env) = {
         def checkStmtF(stmt: Statement, newFeatureExpr: FeatureExpr, newEnv: Env = env) = getStmtType(stmt, newFeatureExpr, newEnv)
         def checkStmt(stmt: Statement) = checkStmtF(stmt, featureExpr)
-        def checkCStmtF(stmt: Conditional[Statement], newFeatureExpr: FeatureExpr, newEnv: Env = env) = stmt.mapf(newFeatureExpr, {
+        def checkCStmtF(stmt: Conditional[Statement], newFeatureExpr: FeatureExpr, newEnv: Env = env) = stmt.vmap(newFeatureExpr, {
             (f, t) => checkStmtF(t, f, newEnv)
         })
         def checkCStmt(stmt: Conditional[Statement], newEnv: Env = env) = checkCStmtF(stmt, featureExpr, newEnv)
         def checkOCStmt(stmt: Option[Conditional[Statement]], newEnv: Env = env) = stmt.map(s => checkCStmt(s, newEnv))
 
-        def expectCScalar(expr: Conditional[Expr], ctx: FeatureExpr = featureExpr) = expr.mapf(ctx, (f, e) => expectScalar(e, f))
+        def expectCScalar(expr: Conditional[Expr], ctx: FeatureExpr = featureExpr) = expr.vmap(ctx, (f, e) => expectScalar(e, f))
         def expectScalar(expr: Expr, ctx: FeatureExpr = featureExpr) = checkExprX(expr, isScalar, {
             c => "expected scalar, found " + c
         }, ctx)
@@ -266,7 +279,7 @@ trait CTypeSystem extends CTypes with CEnv with CDeclTyping with CTypeEnv with C
 
                 //return last type
                 val lastType: Conditional[Option[Conditional[CType]]] = ConditionalLib.lastEntry(typeOptList)
-                val t: Conditional[CType] = lastType.mapr({
+                val t: Conditional[CType] = lastType.flatMap({
                     case None => One(CVoid().toCType)
                     case Some(ctype) => ctype
                 }) simplify (featureExpr);
@@ -302,14 +315,20 @@ trait CTypeSystem extends CTypes with CEnv with CDeclTyping with CTypeEnv with C
                     mexpr match {
 
                         case None =>
-                            if (expectedReturnType map (_.atype == CVoid()) exists (!_))
-                                issueTypeError(Severity.OtherError, featureExpr, "no return expression, expected type " + expectedReturnType, r)
+                            val errorCondition = (expectedReturnType map (_.atype == CVoid())).when(!_)
+                            issueTypeError(Severity.OtherError, featureExpr and errorCondition, "no return expression, expected type " + expectedReturnType, r)
                         case Some(expr) =>
                             val foundReturnType = getExprType(expr, featureExpr, env)
-                            ConditionalLib.mapCombinationF(expectedReturnType, foundReturnType, featureExpr,
-                                (fexpr: FeatureExpr, etype: CType, ftype: CType) =>
-                                    if (!coerce(etype, ftype) && !ftype.isUnknown)
-                                        issueTypeError(Severity.OtherError, fexpr, "incorrect return type, expected " + etype + ", found " + ftype, expr))
+                            ConditionalLib.vmapCombinationOp(expectedReturnType, foundReturnType, featureExpr,
+                                (fexpr: FeatureExpr, etype: CType, ftype: CType) => {
+                                    val c=coerce(etype, ftype)
+                                    if (c.isDefined && c.get.nonEmpty  && !ftype.isUnknown)
+                                        reportTypeError(fexpr, c.get + " (" + etype.toText + " <-" + ftype.toText + ")", expr, severity = Severity.Warning)
+                                    if (!c.isDefined && !ftype.isUnknown)
+                                        if (isVoid(etype))
+                                            issueTypeError(Severity.Warning, fexpr, "'return' with a value, in function returning void", expr)
+                                        else issueTypeError(Severity.OtherError, fexpr, "incorrect return type, expected " + etype.toText + ", found " + ftype.toText, expr)
+                                })
                     }
                 }
                 nop
@@ -351,7 +370,7 @@ trait CTypeSystem extends CTypes with CEnv with CDeclTyping with CTypeEnv with C
     private def performExprCheck(expr: Expr, check: CType => Boolean, errorMsg: CType => String, context: FeatureExpr, env: Env): Conditional[CType] =
         if (context.isSatisfiable()) {
             val ct = getExprType(expr, context, env).simplify(context)
-            ct.mapf(context, {
+            ct.vmap(context, {
                 (f, c) =>
                     checkStructCompleteness(c, f, env, expr) // check struct completeness here, see issue #12
                     if (!check(c) && !c.isUnknown && !c.isIgnore) reportTypeError(f, errorMsg(c), expr) else c
@@ -395,7 +414,7 @@ trait CTypeSystem extends CTypes with CEnv with CDeclTyping with CTypeEnv with C
 
 
     private[typesystem] def evalExpr(expr: Conditional[Expr], context: FeatureExpr, env: Env): Conditional[VValue] =
-        expr mapr (e => e match {
+        expr flatMap (e => e match {
             case Constant(v) => try {
                 One(VInt(v.toInt))
             } catch {
@@ -403,7 +422,7 @@ trait CTypeSystem extends CTypes with CEnv with CDeclTyping with CTypeEnv with C
             }
             case Id(name) =>
                 val varDecl = env.varEnv.getAstOrElse(name, null)
-                varDecl mapfr(context, (f, v) => v match {
+                varDecl vflatMap(context, (f, v) => v match {
                     case Enumerator(Id(enumName), Some(initExpr)) if (name == enumName) =>
                         //TODO: env is not correct (currently dynamic scoping instead of lexical scoping), but we keep this as approximation here
                         evalExpr(One(initExpr), f, env)
@@ -652,23 +671,12 @@ trait CTypeSystem extends CTypes with CEnv with CDeclTyping with CTypeEnv with C
     private def checkTypeSpecifier(specifier: Specifier, expr: FeatureExpr, env: Env) {
         specifier match {
             case TypeDefTypeSpecifier(name) =>
-
-                /**
-                 * CDeclUse:
-                 * Add typdef usage to usages.
-                 */
-                //addTypeUse(name, env, expr)
                 val declExpr = env.typedefEnv.whenDefined(name.name)
                 if ((expr andNot declExpr).isSatisfiable())
                     reportTypeError(expr andNot declExpr, "Type " + name.name + " not defined. (defined only in context " + declExpr + ")", specifier, Severity.TypeLookupError)
 
             case EnumSpecifier(Some(id), None) =>
-
-                /**
-                 * CDeclUse:
-                 * Add enum usage to usages.
-                 */
-                addEnumUse(id, env, expr)
+                addEnumUse(id, env, expr) //CDeclUse: Add enum usage to usages.
             // Not checking enums anymore, since they are only enforced by compilers in few cases (those cases are hard to distinguish, gcc is not very close to the standard here)
             //                val declExpr = env.enumEnv.getOrElse(id.name, FeatureExprFactory.False)
             //                if ((expr andNot declExpr).isSatisfiable)
