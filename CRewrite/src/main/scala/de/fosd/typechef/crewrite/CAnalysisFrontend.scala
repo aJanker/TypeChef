@@ -272,8 +272,8 @@ class CIntraAnalysisFrontendF(tunit: TranslationUnit, ts: CTypeSystemFrontend wi
 
         ss.flatMap(s => {
             ds.danglingSwitchCode(s).map(e => {
-                val currentError = new TypeChefError(Severity.Warning, e.feature, "warning: switch statement has dangling code ", e.entry, "")
-                errNodes ::=(currentError, Opt(e.feature, e.entry))
+                val currentError = new TypeChefError(Severity.Warning, e.condition, "warning: switch statement has dangling code ", e.entry, "")
+                errNodes ::=(currentError, Opt(e.condition, e.entry))
                 currentError
             })
 
@@ -292,8 +292,8 @@ class CIntraAnalysisFrontendF(tunit: TranslationUnit, ts: CTypeSystemFrontend wi
 
         cf.cfgInNonVoidFunc(fa._1).map(
             e => {
-                val currentError = new TypeChefError(Severity.Warning, e.feature, "Control flow of non-void function ends here!", e.entry, "")
-                errNodes ::=(currentError, Opt(e.feature, e.entry))
+                val currentError = new TypeChefError(Severity.Warning, e.condition, "Control flow of non-void function ends here!", e.entry, "")
+                errNodes ::=(currentError, Opt(e.condition, e.entry))
                 currentError
             }
         )
@@ -497,7 +497,7 @@ class CIntraAnalysisFrontendF(tunit: TranslationUnit, ts: CTypeSystemFrontend wi
     private def writeDegree(stmtDegree: (Opt[AST], Int), writer: Writer) = {
         writer.write(stmtDegree._2.toString)
         writer.write(" \tFeature: ")
-        writer.write(stmtDegree._1.feature.toString)
+        writer.write(stmtDegree._1.condition.toString)
         writer.write(" \tStatment: ")
         writer.write(PrettyPrinter.print(stmtDegree._1.entry))
         writer.write(" \tAST: ")
