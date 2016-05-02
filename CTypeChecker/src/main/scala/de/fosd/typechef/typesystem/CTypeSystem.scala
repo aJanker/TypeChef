@@ -363,6 +363,7 @@ trait CTypeSystem extends CTypes with CEnv with CDeclTyping with CTypeEnv with C
             case GotoStatement(_) => nop //TODO check goto against labels
             case LabelStatement(_, _) => nop
             case LocalLabelDeclaration(ids) => nop
+            case Comment(_) => nop
         }
     }
 
