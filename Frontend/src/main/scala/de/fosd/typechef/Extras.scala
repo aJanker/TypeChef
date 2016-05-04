@@ -9,6 +9,8 @@ import de.fosd.typechef.featureexpr.sat.SATFeatureModel
 import de.fosd.typechef.featureexpr.{FeatureExprFactory, FeatureModel, SingleFeatureExpr}
 import de.fosd.typechef.parser.c.{FunctionDef, PostfixExpr, _}
 
+import scala.reflect.ClassTag
+
 /**
  * Created with IntelliJ IDEA.
  * User: rhein
@@ -34,8 +36,8 @@ object Extras {
 
     private def getAllFeaturesRec(root: Any): Set[SingleFeatureExpr] = {
         root match {
-            case x: Opt[_] => x.feature.collectDistinctFeatureObjects.toSet ++ getAllFeaturesRec(x.entry)
-            case x: Choice[_] => x.feature.collectDistinctFeatureObjects.toSet ++ getAllFeaturesRec(x.thenBranch) ++ getAllFeaturesRec(x.elseBranch)
+            case x: Opt[_] => x.condition.collectDistinctFeatureObjects.toSet ++ getAllFeaturesRec(x.entry)
+            case x: Choice[_] => x.condition.collectDistinctFeatureObjects.toSet ++ getAllFeaturesRec(x.thenBranch) ++ getAllFeaturesRec(x.elseBranch)
             case l: List[_] => {
                 var ret: Set[SingleFeatureExpr] = Set()
                 for (x <- l) {
@@ -78,9 +80,9 @@ object Extras {
 
     // copied from de.fosd.typechef.crewrite.CIntraAnalysisFrontend.CIntraAnalysisFrontend
     // in contrast to filterASTElems, filterAllASTElems visits all elements of the tree-wise input structure
-    def filterAllASTElems[T <: AST](a: Any)(implicit m: ClassManifest[T]): List[T] = {
+    def filterAllASTElems[T <: AST](a: Any)(implicit m: ClassTag[T]): List[T] = {
         a match {
-            case p: Product if (m.erasure.isInstance(p)) => List(p.asInstanceOf[T]) ++
+            case p: Product if (m.runtimeClass.isInstance(p)) => List(p.asInstanceOf[T]) ++
                 p.productIterator.toList.flatMap(filterASTElems[T])
             case l: List[_] => l.flatMap(filterASTElems[T])
             case p: Product => p.productIterator.toList.flatMap(filterASTElems[T])
@@ -90,9 +92,9 @@ object Extras {
     // copied from de.fosd.typechef.crewrite.CIntraAnalysisFrontend.CIntraAnalysisFrontend
     // method recursively filters all AST elements for a given type
     // base case is the element of type T
-    def filterASTElems[T <: AST](a: Any)(implicit m: ClassManifest[T]): List[T] = {
+    def filterASTElems[T <: AST](a: Any)(implicit m: ClassTag[T]): List[T] = {
         a match {
-            case p: Product if (m.erasure.isInstance(p)) => List(p.asInstanceOf[T])
+            case p: Product if (m.runtimeClass.isInstance(p)) => List(p.asInstanceOf[T])
             case l: List[_] => l.flatMap(filterASTElems[T])
             case p: Product => p.productIterator.toList.flatMap(filterASTElems[T])
             case _ => List()
