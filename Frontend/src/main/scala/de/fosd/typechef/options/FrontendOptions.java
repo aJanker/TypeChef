@@ -236,9 +236,9 @@ public class FrontendOptions extends CAnalysisOptions implements ParserOptions {
 
 
     public FeatureExpr getFilePresenceCondition() {
-        if (filePC == null) {
+        if (filePC == null && getUseDefaultPC()) {
             File pcFile = new File(getFilePresenceConditionFilename());
-            if (pcFile.exists())
+            if (pcFile.exists() && getUseDefaultPC())
                 filePC = new FeatureExprParserJava(FeatureExprFactory$.MODULE$.dflt()).parseFile(pcFile);
             else
                 filePC = FeatureExprFactory$.MODULE$.dflt().True();
