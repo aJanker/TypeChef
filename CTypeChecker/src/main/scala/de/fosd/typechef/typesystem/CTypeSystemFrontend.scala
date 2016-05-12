@@ -93,12 +93,17 @@ class CTypeSystemFrontend(iast: TranslationUnit,
         errors
     }
 
-    //does not support separate reporting of warnings for backward compatibility
-    def checkASTSilent: Boolean = {
-        isSilent = true
+    // Returns list of errors without warnings
+    def checkASTSilent(): List[TypeChefError] = {
+        var reset = false
+        if (!isSilent)
+            reset = true
+            isSilent = true
         errors = List() // clear error list
         typecheckTranslationUnit(iast)
-        errors.isEmpty
+        if (reset)
+            isSilent = false
+        errors.filterNot(Set(Severity.Warning, Severity.SecurityWarning) contains _.severity)
     }
 
 
