@@ -94,16 +94,20 @@ class CTypeSystemFrontend(iast: TranslationUnit,
     }
 
     // Returns list of errors without warnings
-    def checkASTSilent(): List[TypeChefError] = {
+    def checkASTErrorsSilent(): List[TypeChefError] = {
         var reset = false
         if (!isSilent)
             reset = true
-            isSilent = true
+        isSilent = true
         errors = List() // clear error list
         typecheckTranslationUnit(iast)
         if (reset)
             isSilent = false
         errors.filterNot(Set(Severity.Warning, Severity.SecurityWarning) contains _.severity)
+    }
+
+    def checkASTSilent(): Boolean = {
+        checkASTErrorsSilent.isEmpty
     }
 
 
