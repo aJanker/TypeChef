@@ -307,7 +307,7 @@ object FamilyBasedVsSampleBased extends EnforceTreeHelper with ASTNavigation wit
                 var curTime: Long = 0
 
                 lastTime = tb.getCurrentThreadCpuTime
-                foundError |= !ts.checkASTSilent().isEmpty
+                foundError |= !ts.checkASTSilent()
                 curTime = tb.getCurrentThreadCpuTime - lastTime
                 val productTime: Long = curTime / nstoms
 
