@@ -1,10 +1,10 @@
 package de.fosd.typechef.typesystem
 
-import de.fosd.typechef.featureexpr.FeatureExprFactory.True
-import de.fosd.typechef.parser.c._
 import de.fosd.typechef.conditional._
-import de.fosd.typechef.featureexpr.{FeatureExprFactory, FeatureExpr}
+import de.fosd.typechef.featureexpr.FeatureExprFactory.True
+import de.fosd.typechef.featureexpr.{FeatureExpr, FeatureExprFactory}
 import de.fosd.typechef.lexer.LexerFrontend
+import de.fosd.typechef.parser.c._
 
 /**
  * all compiler-specific built-in stuff
@@ -28,6 +28,7 @@ trait CBuiltIn extends CEnv with CTypes with CDeclTyping {
         (declare_builtin_functions() ++ Map(
             ("__builtin_expect", One(CFunction(Seq(CLong().toCType,CLong().toCType), CLong().toCType).toCType)),  // see http://gcc.gnu.org/onlinedocs/gcc/Other-Builtins.html for signature
             ("__builtin_safe_p", One(CFunction(Seq(CVarArgs()), CInt().toCType).toCType)),
+            ("__builtin_isnan", One(CFunction(Seq(CLong().toCType), CInt().toCType).toCType)), // Added for Ubuntu 16 /usr/include/math.h
             ("__builtin_warning", One(CFunction(Seq(CVarArgs()), CInt().toCType).toCType)),
             ("__builtin_choose_expr", One(CFunction(Seq(CVarArgs()), CInt().toCType).toCType)),
             ("__builtin_constant_p", One(CFunction(Seq(CVarArgs()), CInt().toCType).toCType)),
