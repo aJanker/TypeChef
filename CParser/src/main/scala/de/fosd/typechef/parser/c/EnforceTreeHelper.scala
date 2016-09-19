@@ -19,13 +19,17 @@ trait EnforceTreeHelper {
      */
     def copyPositions(source: Product, target: Product) {
         assert(source.getClass == target.getClass, "cloned tree should match exactly the original, typewise")
-        if (source.isInstanceOf[WithPosition])
-            target.asInstanceOf[WithPosition].range = source.asInstanceOf[WithPosition].range
+
+        source match {
+            case position: WithPosition => target.asInstanceOf[WithPosition].range = position.range
+            case _ =>
+        }
 
         assert(source.productArity == target.productArity, "cloned tree should match exactly the original")
         for ((c1, c2) <- source.productIterator.zip(target.productIterator)) {
-            assert(c1.getClass == c2.getClass, "cloned tree should match exactly the original, typewise")
-            if (c1.isInstanceOf[Product] && c2.isInstanceOf[Product])
+            // The following assert will cause failure, when some replacements in the TranslationUnit took place using kiama
+            // assert(c1.getClass == c2.getClass, "cloned tree should match exactly the original, typewise")
+            if ((c1.getClass == c2.getClass) && c1.isInstanceOf[Product] && c2.isInstanceOf[Product])
                 copyPositions(c1.asInstanceOf[Product], c2.asInstanceOf[Product])
         }
     }
