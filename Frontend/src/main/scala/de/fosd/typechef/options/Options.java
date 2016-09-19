@@ -179,19 +179,19 @@ public abstract class Options {
     }
 
 
-    protected void checkFileExists(String file) throws OptionException {
+    public void checkFileExists(String file) throws OptionException {
         File f = new File(file);
         if (!(f.exists() && f.isFile()))
             throw new OptionException("Expected a file, found " + file);
     }
 
-    protected void checkDirectoryExists(String file) throws OptionException {
+    public void checkDirectoryExists(String file) throws OptionException {
         File f = new File(file);
         if (!(f.exists() && f.isDirectory()))
             throw new OptionException("Expected a directory, found " + file);
     }
 
-    protected void checkFileWritable(String file) throws OptionException {
+    public void checkFileWritable(String file) throws OptionException {
         File f = new File(file);
         if (f.isFile() && (!f.exists() && f.getParentFile().exists()))
             throw new OptionException("Cannot write file " + file);
