@@ -1,7 +1,7 @@
 package de.fosd.typechef.featureexpr
 
-import bdd.BDDFeatureExprFactory
-import sat.SATFeatureExprFactory
+import de.fosd.typechef.featureexpr.bdd.BDDFeatureExprFactory
+import de.fosd.typechef.featureexpr.sat.SATFeatureExprFactory
 
 
 /**
@@ -14,7 +14,7 @@ import sat.SATFeatureExprFactory
  */
 object FeatureExprFactory {
 
-    var default: AbstractFeatureExprFactory = if (System.getProperty("FEATUREEXPR") == "BDD") bdd else sat
+    var default: AbstractFeatureExprFactory = if (System.getProperty("FEATUREEXPR") == "SAT") sat else bdd
     def dflt = default
 
     def setDefault(newFactory: AbstractFeatureExprFactory) {

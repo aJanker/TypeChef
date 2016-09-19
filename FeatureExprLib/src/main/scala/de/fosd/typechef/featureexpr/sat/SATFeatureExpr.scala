@@ -6,7 +6,6 @@ import java.util.Collections
 import de.fosd.typechef.featureexpr._
 import de.fosd.typechef.featureexpr.sat.LazyLib._
 
-import scala.Some
 import scala.collection.convert.decorateAsScala._
 import scala.collection.immutable._
 import scala.collection.mutable.{ArrayBuffer, Map}
@@ -644,7 +643,7 @@ private[sat] object FExprBuilder {
   */
 object True extends And(Set()) with DefaultPrint {
     override def toString = "True"
-    override def toTextExpr = "1"
+    override def toTextExpr = "True"
     override def debug_print(ind: Int) = indent(ind) + toTextExpr + "\n"
     override def isSatisfiable(fm: FeatureModel) = true
     override def evaluate(selectedFeatures: Set[String]) = true
@@ -654,7 +653,7 @@ object True extends And(Set()) with DefaultPrint {
 
 object False extends Or(Set()) with DefaultPrint {
     override def toString = "False"
-    override def toTextExpr = "0"
+    override def toTextExpr = "False"
     override def debug_print(ind: Int) = indent(ind) + toTextExpr + "\n"
     override def isSatisfiable(fm: FeatureModel) = false
     override def evaluate(selectedFeatures: Set[String]) = false
@@ -997,7 +996,7 @@ class DefinedExternal(name: String) extends DefinedExpr {
     DefinedExpr.checkFeatureName(name)
 
     def feature = name
-    override def toTextExpr = "definedEx(" + name + ")";
+    override def toTextExpr = /* "definedEx(" + */name /*+ ")";*/
     override def toString = "def(" + name + ")"
     def countSize() = 1
     def isExternal = true

@@ -31,6 +31,8 @@ class BDDFeatureExpr(private[featureexpr] val bdd: BDD) extends FeatureExpr {
 
     import CastHelper._
 
+    def leak = bdd
+
     def or(that: FeatureExpr): FeatureExpr = {
         if (that == FeatureExprFactory.True) FeatureExprFactory.True
         else FExprBuilder.or(this, asBDDFeatureExpr(that))
@@ -446,8 +448,7 @@ class SingleBDDFeatureExpr(id: Int) extends BDDFeatureExpr(lookupFeatureBDD(id))
  * Central builder class, responsible for simplification of expressions during creation
  * and for extensive caching.
  */
-private[bdd] object FExprBuilder {
-
+object FExprBuilder {
 
     val bddCacheSize = 100000
     var bddValNum: Int = 524288 / 2
@@ -536,7 +537,7 @@ private[bdd] object FExprBuilder {
 
 object True extends BDDFeatureExpr(FExprBuilder.TRUE) with DefaultPrint with SingleFeatureExpr {
     override def toString = "True"
-    override def toTextExpr = "1"
+    override def toTextExpr = "True"
     override def debug_print(ind: Int) = indent(ind) + toTextExpr + "\n"
     override def isSatisfiable(fm: FeatureModel) = true
     override def feature = toString
@@ -545,7 +546,7 @@ object True extends BDDFeatureExpr(FExprBuilder.TRUE) with DefaultPrint with Sin
 
 object False extends BDDFeatureExpr(FExprBuilder.FALSE) with DefaultPrint with SingleFeatureExpr {
     override def toString = "False"
-    override def toTextExpr = "0"
+    override def toTextExpr = "False"
     override def debug_print(ind: Int) = indent(ind) + toTextExpr + "\n"
     override def isSatisfiable(fm: FeatureModel) = false
     override def feature = toString
