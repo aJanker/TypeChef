@@ -252,6 +252,10 @@ public class FrontendOptions extends CAnalysisOptions implements ParserOptions {
         return outputStem + ".cfg.dot";
     }
 
+   public String getOutputStem() {
+	return outputStem;
+   }
+
     public boolean printParserStatistics() {
         return parserStatistics;
     }
