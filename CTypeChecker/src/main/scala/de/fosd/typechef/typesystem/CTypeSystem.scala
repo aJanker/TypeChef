@@ -6,17 +6,17 @@ import de.fosd.typechef.featureexpr._
 import de.fosd.typechef.parser.c._
 
 /**
- * checks an AST (from CParser) for type errors (especially dangling references)
- *
- * performs type checking in a single tree-walk, uses lookup functions from various traits
- *
- * @author kaestner
- *
- */
+  * checks an AST (from CParser) for type errors (especially dangling references)
+  *
+  * performs type checking in a single tree-walk, uses lookup functions from various traits
+  *
+  * @author kaestner
+  *
+  */
 
 trait CTypeSystem extends CTypes with CEnv with CDeclTyping with CTypeEnv with CExprTyping with CBuiltIn with CDeclUseInterface {
 
-    def typecheckTranslationUnit(tunit: TranslationUnit, featureModel: FeatureExpr = FeatureExprFactory.True) {
+    def typecheckTranslationUnit(tunit: TranslationUnit, featureModel: FeatureExpr = FeatureExprFactory.True) : Env = {
         assert(tunit != null, "cannot type check Translation Unit, tunit is null")
         clearDeclUseMap()
         checkTranslationUnit(tunit, featureModel, initialEnv)
@@ -697,7 +697,3 @@ trait CTypeSystem extends CTypes with CEnv with CDeclTyping with CTypeEnv with C
 
 
 }
-
-
-
-

@@ -34,6 +34,8 @@ class CTypeSystemFrontend(iast: TranslationUnit,
         this
     }
 
+    var finalEnv : Env = EmptyEnv
+
     val DEBUG_PRINT = false
 
     def dbgPrint(o: Any) {
@@ -46,6 +48,7 @@ class CTypeSystemFrontend(iast: TranslationUnit,
 
     val verbose = false
 
+    def typeCheckedEnv() : Env = { finalEnv }
 
     var externalDefCounter: Int = 0
 
@@ -66,11 +69,6 @@ class CTypeSystemFrontend(iast: TranslationUnit,
         }
     }
 
-
-
-
-
-
     /**
       * Returns true iff no errors were found.
       * @return
@@ -78,7 +76,7 @@ class CTypeSystemFrontend(iast: TranslationUnit,
     def checkAST(ignoreWarnings: Boolean = true, printResults: Boolean = false): List[TypeChefError] = {
 
         errors = List() // clear error list
-        typecheckTranslationUnit(iast)
+        val env = typecheckTranslationUnit(iast)
         val merrors = if (ignoreWarnings)
             errors.filterNot(Set(Severity.Warning, Severity.SecurityWarning) contains _.severity)
         else errors
@@ -88,8 +86,7 @@ class CTypeSystemFrontend(iast: TranslationUnit,
             else {
                 println("Found " + merrors.size + " type errors: ")
             }
-        //println("\n")
-
+        finalEnv = env
         errors
     }
 
@@ -100,8 +97,6 @@ class CTypeSystemFrontend(iast: TranslationUnit,
         typecheckTranslationUnit(iast)
         errors.isEmpty
     }
-
-
 }
 
 
