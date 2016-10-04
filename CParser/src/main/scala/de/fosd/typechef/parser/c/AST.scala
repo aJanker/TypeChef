@@ -1,7 +1,7 @@
 package de.fosd.typechef.parser.c
 
 import de.fosd.typechef.conditional._
-import de.fosd.typechef.error.{WithPosition, Position}
+import de.fosd.typechef.error.{CopyPositions, Position, WithPosition}
 
 /**
  * AST for C
@@ -57,28 +57,11 @@ LocalLabelDeclaration -- label names
   */
 
 //Expressions
-trait AST extends Product with Serializable with Cloneable with WithPosition {
+trait AST extends Product with Serializable with Cloneable with WithPosition with CopyPositions {
     override def clone(): AST.this.type = {
         val clone = super.clone().asInstanceOf[AST.this.type]
         copyPositions(this, clone)
         clone
-    }
-
-    private def copyPositions(source: Product, target: Product) {
-        assert(source.getClass == target.getClass, "cloned tree should match exactly the original, typewise")
-
-        source match {
-            case position: WithPosition => target.asInstanceOf[WithPosition].range = position.range
-            case _ =>
-        }
-
-        assert(source.productArity == target.productArity, "cloned tree should match exactly the original")
-        for ((c1, c2) <- source.productIterator.zip(target.productIterator)) {
-            // The following assert will cause failure, when some replacements in the TranslationUnit took place using kiama
-            // assert(c1.getClass == c2.getClass, "cloned tree should match exactly the original, typewise")
-            if ((c1.getClass == c2.getClass) && c1.isInstanceOf[Product] && c2.isInstanceOf[Product])
-                copyPositions(c1.asInstanceOf[Product], c2.asInstanceOf[Product])
-        }
     }
 }
 

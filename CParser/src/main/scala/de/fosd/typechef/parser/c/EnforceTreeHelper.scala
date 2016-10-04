@@ -1,8 +1,6 @@
 package de.fosd.typechef.parser.c
 
 import de.fosd.typechef.conditional.{One, Opt}
-import de.fosd.typechef.error.WithPosition
-import org.kiama.rewriting.Rewriter._
 
 
 /**
@@ -12,28 +10,7 @@ import org.kiama.rewriting.Rewriter._
  * we use the product interface of the elements here works both for
  * case classes Opt and AST elements, which derive product directly
  */
-trait EnforceTreeHelper {
-
-    /**
-     * unfortunately cloning loses position information, so we have to reassign it
-     */
-    def copyPositions(source: Product, target: Product) {
-        assert(source.getClass == target.getClass, "cloned tree should match exactly the original, typewise")
-
-        source match {
-            case position: WithPosition => target.asInstanceOf[WithPosition].range = position.range
-            case _ =>
-        }
-
-        assert(source.productArity == target.productArity, "cloned tree should match exactly the original")
-        for ((c1, c2) <- source.productIterator.zip(target.productIterator)) {
-            // The following assert will cause failure, when some replacements in the TranslationUnit took place using kiama
-            // assert(c1.getClass == c2.getClass, "cloned tree should match exactly the original, typewise")
-            if ((c1.getClass == c2.getClass) && c1.isInstanceOf[Product] && c2.isInstanceOf[Product])
-                copyPositions(c1.asInstanceOf[Product], c2.asInstanceOf[Product])
-        }
-    }
-
+trait EnforceTreeHelper extends ASTRewriting {
 
     // creates an AST without shared objects
     // the parser reuses parsed elements in different subtrees of the AST
@@ -51,9 +28,7 @@ trait EnforceTreeHelper {
                 ForStatement(None, Some(Constant("1")), None, One(CompoundStatement(List())))
             case n: AST => n.clone()
         })
-        val cast = clone(ast).get.asInstanceOf[T]
-        copyPositions(ast, cast)
-        cast
+        clone(ast).get.asInstanceOf[T]
     }
 
     // cparser creates dead ast nodes that causes problems in the control flow analysis (grouping of ast nodes etc.)
@@ -69,9 +44,7 @@ trait EnforceTreeHelper {
             })
         })
 
-        val cast = removedead(ast).get.asInstanceOf[T]
-        copyPositions(ast, cast)
-        cast
+        removedead(ast).get.asInstanceOf[T]
     }
 
     // function to add a break expression to infinite loops: "for (;;) {}" and "for (;;) ;"
@@ -88,9 +61,7 @@ trait EnforceTreeHelper {
             case n: AST => n
         })
 
-        val cast = rewrite(ast).get.asInstanceOf[T]
-        copyPositions(ast, cast)
-        cast
+        rewrite(ast).get.asInstanceOf[T]
     }
 
     // filter AST nodes that do not have position information

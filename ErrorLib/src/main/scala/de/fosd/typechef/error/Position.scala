@@ -49,3 +49,20 @@ trait WithPosition {
     def rangeClean = if (hasPosition) range.get else (NoPosition, NoPosition)
 }
 
+trait CopyPositions {
+    def copyPositions(source: Product, target: Product) {
+        assert(source.getClass == target.getClass, "cloned tree should match exactly the original, typewise")
+        assert(source.productArity == target.productArity, "cloned tree should match exactly the original")
+
+        source match {
+            case position: WithPosition => target.asInstanceOf[WithPosition].range = position.range
+            case _ =>
+        }
+
+        source.productIterator.zip(target.productIterator).foreach {
+            case (c1: Product, c2: Product) if c1.getClass == c2.getClass => copyPositions(c1, c2)
+            case _ =>
+        }
+    }
+}
+
