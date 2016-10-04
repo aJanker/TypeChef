@@ -11,7 +11,7 @@ object BuildSettings {
     import Dependencies._
 
     val buildOrganization = "de.fosd.typechef"
-    val buildVersion = "0.4.1"
+    val buildVersion = "0.4.1_lift"
     val buildScalaVersion = "2.11.7"
 
 
