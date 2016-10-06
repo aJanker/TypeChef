@@ -20,6 +20,7 @@ object ProductDerivation extends ASTRewriting {
         })
 
         val cast = prod(ast).get.asInstanceOf[T]
+        checkPositionInformation(cast)
         cast
     }
 }
