@@ -1,15 +1,13 @@
 package de.fosd.typechef.typesystem
 
-import java.util.IdentityHashMap
-
-import de.fosd.typechef.parser.c.{FunctionDef, Expr, AST}
 import de.fosd.typechef.conditional.Conditional
 import de.fosd.typechef.featureexpr.FeatureExpr
+import de.fosd.typechef.parser.c.{AST, Expr, FunctionDef}
 
 
 trait CTypeCache extends CTypeSystemInterface {
-    private val cacheExpr: IdentityHashMap[Expr, Conditional[CType]] = new IdentityHashMap()
-    private val cacheFun: IdentityHashMap[FunctionDef, Conditional[CType]] = new IdentityHashMap()
+    private val cacheExpr: java.util.IdentityHashMap[Expr, Conditional[CType]] = new java.util.IdentityHashMap()
+    private val cacheFun: java.util.IdentityHashMap[FunctionDef, Conditional[CType]] = new java.util.IdentityHashMap()
 
     override protected def typedExpr(expr: Expr, ctype: Conditional[CType], featureExpr: FeatureExpr, env: Env) {
         cacheExpr.put(expr, ctype)
@@ -27,13 +25,13 @@ trait CTypeCache extends CTypeSystemInterface {
 
 
 trait CEnvCache extends CTypeSystemInterface {
-    private var cache: Map[AST, Env] = Map()
+    private val cache: java.util.IdentityHashMap[AST, Env] = new java.util.IdentityHashMap()
 
     override protected def addEnv(ast: AST, env: Env) {
-        cache = cache + (ast -> env)
+        cache.put(ast, env)
         super.addEnv(ast, env)
     }
 
-    def lookupEnv(ast: AST) = cache(ast)
+    def lookupEnv(ast: AST) = cache.get(ast)
 }
 
