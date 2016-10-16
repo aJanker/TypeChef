@@ -12,7 +12,7 @@ object BuildSettings {
 
     val buildOrganization = "de.fosd.typechef"
     val buildVersion = "0.4.1_lift"
-    val buildScalaVersion = "2.11.7"
+    val buildScalaVersion = "2.11.8"
 
 
     val buildSettings = Defaults.coreDefaultSettings ++ Seq(
@@ -38,8 +38,6 @@ object BuildSettings {
                 )
                 else Nil
         },
-
-        crossScalaVersions := Seq("2.10.4", "2.11.4"),
 
         conflictWarning := ConflictWarning.disable,
 
@@ -86,9 +84,7 @@ object BuildSettings {
                         <id>ckaestne</id> <name>Christian Kaestner</name> <url>http://www.cs.cmu.edu/~ckaestne/</url>
                     </developer>
                 </developers>,
-
-        credentials += Credentials(Path.userHome / ".ivy2" / ".credentials")
-    ) 
+    )
 }
 
 object ShellPrompt {
@@ -251,7 +247,7 @@ object TypeChef extends Build {
     def kiamaDependency(scalaVersion: String, testOnly: Boolean = false) = {
         val x = scalaVersion match {
             case "2.9.1" => "com.googlecode.kiama" %% "kiama" % "1.2.0"
-            case _ => "com.googlecode.kiama" %% "kiama" % "1.8.0"
+            case _ => "com.googlecode.kiama" %% "kiama" % "2.0.0"
         }
         if (testOnly) x % "test" else x
     }
