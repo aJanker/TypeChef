@@ -1,10 +1,9 @@
 package de.fosd.typechef.crewrite
 
-import org.kiama.rewriting.Rewriter._
-
+import de.fosd.typechef.featureexpr.FeatureModel
 import de.fosd.typechef.parser.c._
 import de.fosd.typechef.typesystem.{DeclUseMap, UseDeclMap}
-import de.fosd.typechef.featureexpr.FeatureModel
+import org.bitbucket.inkytonik.kiama.rewriting.Rewriter._
 
 // implements reaching definitions (rd) dataflow analysis
 // see http://en.wikipedia.org/wiki/Reaching_definition

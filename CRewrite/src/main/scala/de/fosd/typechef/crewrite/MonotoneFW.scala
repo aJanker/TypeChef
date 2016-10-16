@@ -1,11 +1,9 @@
 package de.fosd.typechef.crewrite
 
-import org.kiama.attribution.Attribution.circular
-
+import de.fosd.typechef.conditional.Opt
+import de.fosd.typechef.featureexpr.{FeatureExpr, FeatureModel}
 import de.fosd.typechef.parser.c._
 import de.fosd.typechef.typesystem.{DeclUseMap, UseDeclMap}
-import de.fosd.typechef.featureexpr.{FeatureModel, FeatureExpr}
-import de.fosd.typechef.conditional.Opt
 
 // this abstract class provides a standard implementation of
 // the monotone framework, a general framework for dataflow analyses

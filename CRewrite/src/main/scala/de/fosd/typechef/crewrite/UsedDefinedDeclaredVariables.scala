@@ -1,9 +1,7 @@
 package de.fosd.typechef.crewrite
 
-import org.kiama.attribution.Attribution._
-
-import de.fosd.typechef.parser.c._
 import de.fosd.typechef.conditional._
+import de.fosd.typechef.parser.c._
 
 // defines functions to compute sets for used, defined, and declared variables
 // used for Liveness and ReachingDefinitions
