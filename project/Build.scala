@@ -21,8 +21,8 @@ object BuildSettings {
         scalaVersion := buildScalaVersion,
         shellPrompt := ShellPrompt.buildShellPrompt,
 
-        javacOptions ++= Seq("-Xlint:unchecked", "-target", "1.7", "-source", "1.7"),
-        scalacOptions ++= Seq("-deprecation", "-unchecked", "-optimise", "-target:jvm-1.7"),
+        javacOptions ++= Seq("-Xlint:unchecked", "-target", "1.8", "-source", "1.8"),
+        scalacOptions ++= Seq("-deprecation", "-unchecked", "-optimise", "-target:jvm-1.8"),
         testOptions += Tests.Argument(TestFrameworks.JUnit, "-q", "-v"),
 
         // suppress feature warnings in Scala 2.10.x
@@ -83,7 +83,7 @@ object BuildSettings {
                     <developer>
                         <id>ckaestne</id> <name>Christian Kaestner</name> <url>http://www.cs.cmu.edu/~ckaestne/</url>
                     </developer>
-                </developers>,
+                </developers>
     )
 }
 
