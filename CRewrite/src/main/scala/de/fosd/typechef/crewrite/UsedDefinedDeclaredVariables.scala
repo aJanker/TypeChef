@@ -5,7 +5,7 @@ import de.fosd.typechef.parser.c._
 
 // defines functions to compute sets for used, defined, and declared variables
 // used for Liveness and ReachingDefinitions
-trait UsedDefinedDeclaredVariables {
+trait UsedDefinedDeclaredVariables extends org.bitbucket.inkytonik.kiama.attribution.AttributionCore {
 
     // returns all declared Ids independent of their annotation
     val declares: AnyRef => List[Id] =

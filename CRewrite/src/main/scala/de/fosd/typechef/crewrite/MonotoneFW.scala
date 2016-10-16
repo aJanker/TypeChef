@@ -5,6 +5,7 @@ import de.fosd.typechef.featureexpr.{FeatureExpr, FeatureModel}
 import de.fosd.typechef.parser.c._
 import de.fosd.typechef.typesystem.{DeclUseMap, UseDeclMap}
 
+
 // this abstract class provides a standard implementation of
 // the monotone framework, a general framework for dataflow analyses
 // such as liveness, available expression, double-free, ...
@@ -28,7 +29,7 @@ import de.fosd.typechef.typesystem.{DeclUseMap, UseDeclMap}
 // env: ASTEnv; environment used for navigation in the AST during predecessor and
 //              successor determination
 // fm: FeatureModel; feature model used for filtering out false positives
-sealed abstract class MonotoneFW[T](env: ASTEnv, val fm: FeatureModel) extends IntraCFG with CFGHelper {
+sealed abstract class MonotoneFW[T](env: ASTEnv, val fm: FeatureModel) extends IntraCFG with CFGHelper with org.bitbucket.inkytonik.kiama.attribution.AttributionCore {
 
     // dataflow, such as identifiers (type Id) may have different declarations
     // (alternative types). so we track alternative elements here using two
