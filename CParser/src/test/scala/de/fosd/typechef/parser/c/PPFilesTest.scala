@@ -1,10 +1,11 @@
 package de.fosd.typechef.parser.c
 
-import junit.framework.Assert._
-import de.fosd.typechef.featureexpr._
-import org.kiama.rewriting.Rewriter._
-import org.junit.{Assert, Ignore, Test}
 import java.util.Collections
+
+import de.fosd.typechef.featureexpr._
+import junit.framework.Assert._
+import org.bitbucket.inkytonik.kiama.rewriting.Rewriter._
+import org.junit.{Assert, Ignore, Test}
 
 class PPFilesTest extends TestHelper {
     def parseFile(fileName: String) {

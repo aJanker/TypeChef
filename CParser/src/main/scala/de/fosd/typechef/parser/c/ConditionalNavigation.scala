@@ -1,9 +1,8 @@
 package de.fosd.typechef.parser.c
 
 import de.fosd.typechef.conditional._
-
-import org.kiama.rewriting.Rewriter._
-import de.fosd.typechef.featureexpr.{FeatureExprFactory, FeatureExpr}
+import de.fosd.typechef.featureexpr.{FeatureExpr, FeatureExprFactory}
+import org.bitbucket.inkytonik.kiama.rewriting.Rewriter._
 
 trait ConditionalNavigation {
     def parentOpt(e: Product, env: ASTEnv): Opt[_] = {

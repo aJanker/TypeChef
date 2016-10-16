@@ -3,7 +3,7 @@ package de.fosd.typechef.parser.c
 import de.fosd.typechef.conditional.{One, Opt}
 import de.fosd.typechef.error.WithPosition
 
-trait ASTRewriting extends org.kiama.rewriting.CallbackRewriter {
+trait ASTRewriting extends org.bitbucket.inkytonik.kiama.rewriting.CallbackRewriter {
 
     /**
       * Rewriting ast nodes with kiama causes the loss of position informations.

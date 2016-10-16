@@ -1,11 +1,12 @@
 package de.fosd.typechef.parser.c
 
-import junit.framework._;
-import junit.framework.Assert._
-import de.fosd.typechef.featureexpr._
-import org.junit.Test
-import org.kiama.rewriting.Rewriter._
 import java.util.Collections
+
+import de.fosd.typechef.featureexpr._
+import junit.framework.Assert._
+import junit.framework._
+import org.bitbucket.inkytonik.kiama.rewriting.Rewriter._
+import org.junit.Test
 
 
 class CGramFilesTest extends TestCase with TestHelper {

@@ -1,15 +1,13 @@
 package de.fosd.typechef.parser.c
 
+import java.io.{File, FileWriter}
+
+import de.fosd.typechef.conditional.{Choice, Opt}
+import de.fosd.typechef.error.Position
+import de.fosd.typechef.featureexpr.FeatureExprFactory.True
 import de.fosd.typechef.featureexpr._
 import de.fosd.typechef.parser._
-import java.io.{FileWriter, File}
-import FeatureExprFactory.True
-import java.util.Collections
-import de.fosd.typechef.error.{WithPosition, Position}
-import de.fosd.typechef.conditional.{One, Choice, Opt}
-import de.fosd.typechef.lexer.LexerFrontend
-import org.kiama.rewriting.Rewriter._
-import org.kiama.rewriting.Strategy
+import org.bitbucket.inkytonik.kiama.rewriting.Rewriter._
 
 object MyUtil {
     implicit def runnable(f: () => Unit): Runnable =

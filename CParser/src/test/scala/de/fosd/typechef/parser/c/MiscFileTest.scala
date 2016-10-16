@@ -4,8 +4,8 @@ import java.util.Collections
 
 import de.fosd.typechef.featureexpr._
 import junit.framework.Assert._
-import org.junit.{Assert, Ignore, Test}
-import org.kiama.rewriting.Rewriter._
+import org.bitbucket.inkytonik.kiama.rewriting.Rewriter._
+import org.junit.{Assert, Ignore}
 
 class MiscFileTest extends TestHelper {
     def parseFile(fileName: String) {
