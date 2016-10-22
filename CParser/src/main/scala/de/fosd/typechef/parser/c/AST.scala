@@ -63,24 +63,6 @@ trait AST extends Product with Serializable with Cloneable with WithPosition wit
         copyPositions(this, clone)
         clone
     }
-
-    override def canEqual(that: Any): Boolean = that.isInstanceOf[AST.this.type]
-
-    override def equals(other: scala.Any): Boolean =
-        if (canEqual(other)) {
-            val that = other.asInstanceOf[AST.this.type]
-            val eqPosition =
-                if (this.hasPosition && that.hasPosition) this.range.equals(that.range)
-                else true
-            eqPosition && super.equals(other)
-        } else false
-
-    override def hashCode(): Int = {
-        val positionHashCode =
-            if (this.hasPosition) this.range.hashCode()
-            else 0
-        super.hashCode() + positionHashCode
-    }
 }
 
 trait CFGStmt extends AST
