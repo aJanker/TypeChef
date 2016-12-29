@@ -1,7 +1,7 @@
 package de.fosd.typechef.conditional
 
 import de.fosd.typechef.featureexpr.FeatureExpr
-import de.fosd.typechef.featureexpr.FeatureExprFactory.{True, False}
+import de.fosd.typechef.featureexpr.FeatureExprFactory.{False, True}
 
 /**
  * maintains a map

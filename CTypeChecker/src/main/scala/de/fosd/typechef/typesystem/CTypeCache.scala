@@ -4,7 +4,6 @@ import de.fosd.typechef.conditional.Conditional
 import de.fosd.typechef.featureexpr.FeatureExpr
 import de.fosd.typechef.parser.c.{AST, Expr, FunctionDef}
 
-
 trait CTypeCache extends CTypeSystemInterface {
     private val cacheExpr: java.util.IdentityHashMap[Expr, Conditional[CType]] = new java.util.IdentityHashMap()
     private val cacheFun: java.util.IdentityHashMap[FunctionDef, Conditional[CType]] = new java.util.IdentityHashMap()
@@ -32,6 +31,6 @@ trait CEnvCache extends CTypeSystemInterface {
         super.addEnv(ast, env)
     }
 
-    def lookupEnv(ast: AST) = cache.get(ast)
+    def lookupEnv(ast: AST): Env = cache.get(ast)
 }
 

@@ -15,10 +15,10 @@ import scala.reflect.ClassTag
 
 
 /**
- * Wrapper case class for IdentityHashMap as java's IdentityHashMap allows get(Anyref)
- *
- * @param iIdHashMap the wrapped map
- */
+  * Wrapper case class for IdentityHashMap as java's IdentityHashMap allows get(Anyref)
+  *
+  * @param iIdHashMap the wrapped map
+  */
 case class IdentityIdHashMap(iIdHashMap: util.IdentityHashMap[Id, List[Id]]) extends Iterable[(Id, List[Id])] {
 
     def get(id: Id) = iIdHashMap.get(id)
@@ -81,6 +81,7 @@ trait CDeclUse extends CDeclUseInterface with CEnv with CEnvCache {
 
     private var declUseMap: util.IdentityHashMap[Id, util.Set[Id]] = new util.IdentityHashMap()
     private var useDeclMap: util.IdentityHashMap[Id, List[Id]] = new util.IdentityHashMap()
+    private var declDefMap: util.IdentityHashMap[Id, List[Id]] = new util.IdentityHashMap()
     private var structUsage: util.IdentityHashMap[Id, FeatureExpr] = new util.IdentityHashMap()
 
     private var stringToIdMap: Map[String, Id] = Map()
@@ -104,29 +105,26 @@ trait CDeclUse extends CDeclUseInterface with CEnv with CEnvCache {
         }
     }
 
-    private def addToUseDeclMap(use: Id, decl: Id) = {
-        if (useDeclMap.contains(use)) {
-            useDeclMap.put(use, decl :: useDeclMap.get(use))
-        } else {
-            useDeclMap.put(use, List(decl))
-        }
-    }
+    private def genericAdd[T](key: T, value: T, map: util.Map[T, List[T]]) =
+        if (map.contains(key)) map.put(key, value :: map.get(key))
+        else map.put(key, List(value))
+
+    private def addToUseDeclMap(use: Id, decl: Id) = genericAdd(use, decl, useDeclMap)
+
+    private def addToDeclDefMap(decl: Id, defId: Id) = genericAdd(decl, defId, declDefMap)
 
     override def clearDeclUseMap() {
         declUseMap.clear()
         useDeclMap.clear()
+        declDefMap.clear()
+        structUsage.clear()
     }
 
     override def init() {
-        if (declUseMap == null) {
-            declUseMap = new util.IdentityHashMap()
-        }
-        if (useDeclMap == null) {
-            useDeclMap = new util.IdentityHashMap()
-        }
-        if (structUsage == null) {
-            structUsage = new util.IdentityHashMap()
-        }
+        if (declUseMap == null) declUseMap = new util.IdentityHashMap()
+        if (useDeclMap == null) useDeclMap = new util.IdentityHashMap()
+        if (declDefMap == null) structUsage = new util.IdentityHashMap()
+        if (structUsage == null) structUsage = new util.IdentityHashMap()
     }
 
     def getDeclUseMap: IdentityIdHashMap = {
@@ -137,6 +135,7 @@ trait CDeclUse extends CDeclUseInterface with CEnv with CEnvCache {
 
     def getUseDeclMap = IdentityIdHashMap(useDeclMap)
 
+    def getDeclDefMap = IdentityIdHashMap(declDefMap)
 
     // add definition:
     //   - function: function declarations (forward declarations) and function definitions are handled
@@ -145,7 +144,13 @@ trait CDeclUse extends CDeclUseInterface with CEnv with CEnvCache {
     override def addDefinition(definition: AST, env: Env, feature: FeatureExpr, isFunctionDeclarator: Boolean = false) {
         definition match {
             case id: Id =>
-                if (isFunctionDeclarator) addFunctionDeclaration(env, id, feature)
+                if (isFunctionDeclarator) addForwardDeclaration(env, id, feature)
+                else if (env.varEnv.getAstOrElse(id.name, null) != null)
+                    env.varEnv.lookupScope(id.name).vmap(feature,
+                        (f, s) =>
+                            if (s == 0 && s == env.scope) // Forward declaration of variable in case if defined in header and then again later in the global scope. (eg extern int i; ini i;)
+                                addForwardDeclaration(env, id, f)
+                            else putToDeclUseMap(id))
                 else putToDeclUseMap(id)
             case _ =>
         }
@@ -164,7 +169,7 @@ trait CDeclUse extends CDeclUseInterface with CEnv with CEnvCache {
         }
     }
 
-    private def addFunctionDeclaration(env: Env, declaration: Id, feature: FeatureExpr) {
+    private def addForwardDeclaration(env: Env, declaration: Id, feature: FeatureExpr) {
 
         def swapDeclaration(originalDecl: Id, newDecl: Id) = {
             if (!originalDecl.eq(newDecl)) {
@@ -172,6 +177,7 @@ trait CDeclUse extends CDeclUseInterface with CEnv with CEnvCache {
                 addToDeclUseMap(newDecl, originalDecl)
                 declUseMap.get(originalDecl).foreach(x => addToDeclUseMap(newDecl, x))
                 declUseMap.remove(originalDecl)
+                addToDeclDefMap(newDecl, originalDecl)
             }
         }
 

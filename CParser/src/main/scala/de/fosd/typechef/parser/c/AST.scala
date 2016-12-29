@@ -345,11 +345,13 @@ case class StructInitializer(expr: Expr, attributes: List[Opt[AttributeSpecifier
 case class AsmExpr(isVolatile: Boolean, expr: Expr) extends AST with ExternalDef
 
 case class FunctionDef(specifiers: List[Opt[Specifier]], declarator: Declarator, oldStyleParameters: List[Opt[OldParameterDeclaration]], stmt: CompoundStatement) extends AST with ExternalDef with CFGStmt with CDef {
-    def getName = declarator.getName
+    def getName: String = declarator.getName
+    def getId: Id = declarator.getId
 }
 
 case class NestedFunctionDef(isAuto: Boolean, specifiers: List[Opt[Specifier]], declarator: Declarator, parameters: List[Opt[Declaration]], stmt: CompoundStatement) extends CompoundDeclaration with CDef {
-    def getName = declarator.getName
+    def getName: String = declarator.getName
+    def getId: Id = declarator.getId
 }
 
 
