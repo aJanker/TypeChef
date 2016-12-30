@@ -21,17 +21,17 @@ import scala.reflect.ClassTag
   */
 case class IdentityIdHashMap(iIdHashMap: util.IdentityHashMap[Id, List[Id]]) extends Iterable[(Id, List[Id])] {
 
-    def get(id: Id) = iIdHashMap.get(id)
+    def get(id: Id): List[Id] = iIdHashMap.get(id)
 
-    def containsKey(id: Id) = iIdHashMap.containsKey(id)
+    def containsKey(id: Id): Boolean = iIdHashMap.containsKey(id)
 
-    def keySet = iIdHashMap.keySet
+    def keySet: util.Set[Id] = iIdHashMap.keySet
 
-    def keys = keySet.toArray(Array[Id]()).toList
+    def keys: List[Id] = keySet.toArray(Array[Id]()).toList
 
-    def values = iIdHashMap.values
+    def values: util.Collection[List[Id]] = iIdHashMap.values
 
-    def iterator = iIdHashMap.iterator
+    def iterator: Iterator[(Id, List[Id])] = iIdHashMap.iterator
 }
 
 // this trait is a hook into the typesystem to preserve typing informations
@@ -56,7 +56,7 @@ trait CDeclUseInterface extends CEnv {
 
     def addUse(entry: AST, feature: FeatureExpr, env: Env) {}
 
-    def addOldStyleParameters(oldStyleParameters: List[Opt[OldParameterDeclaration]], declarator: Declarator, expr: FeatureExpr, env: Env) = {}
+    def addOldStyleParameters(oldStyleParameters: List[Opt[OldParameterDeclaration]], declarator: Declarator, expr: FeatureExpr, env: Env): Unit = {}
 
     def addStructUse(entry: AST, featureExpr: FeatureExpr, env: Env, structName: String, isUnion: Boolean) {}
 
@@ -106,7 +106,7 @@ trait CDeclUse extends CDeclUseInterface with CEnv with CEnvCache {
     }
 
     private def genericAdd[T](key: T, value: T, map: util.Map[T, List[T]]) =
-        if (map.contains(key)) map.put(key, value :: map.get(key))
+        if (map.containsKey(key)) map.put(key, value :: map.get(key))
         else map.put(key, List(value))
 
     private def addToUseDeclMap(use: Id, decl: Id) = genericAdd(use, decl, useDeclMap)
@@ -175,7 +175,7 @@ trait CDeclUse extends CDeclUseInterface with CEnv with CEnvCache {
             if (!originalDecl.eq(newDecl)) {
                 putToDeclUseMap(newDecl)
                 addToDeclUseMap(newDecl, originalDecl)
-                declUseMap.get(originalDecl).foreach(x => addToDeclUseMap(newDecl, x))
+                declUseMap.get(originalDecl).foreach(addToDeclUseMap(newDecl, _))
                 declUseMap.remove(originalDecl)
                 addToDeclDefMap(newDecl, originalDecl)
             }
@@ -187,9 +187,9 @@ trait CDeclUse extends CDeclUseInterface with CEnv with CEnvCache {
         // (2) int foo(){}
         // we have to swap the definition of (2) with (1) as declaration and (1) as use,
         // because all further calls are refered to (2)
-        def addForwardDeclartion(original: Id, x: (FeatureExpr, AST)): Any = {
+        def putForwardDeclaration(original: Id, x: (FeatureExpr, AST)): Any = {
             if (declUseMap.containsKey(original)) {
-                if (feature.equivalentTo(FeatureExprFactory.True) || (feature.implies(x._1).isTautology())) swapDeclaration(original, declaration)
+                if (feature.equivalentTo(FeatureExprFactory.True) || feature.implies(x._1).isTautology()) swapDeclaration(original, declaration)
                 else putToDeclUseMap(declaration)
             } else {
                 putToDeclUseMap(declaration)
@@ -203,8 +203,8 @@ trait CDeclUse extends CDeclUseInterface with CEnv with CEnvCache {
             case c@Choice(_, _, _) =>
                 conditionalToTuple(c).foreach(x => {
                     x._2 match {
-                        case i: InitDeclarator => addForwardDeclartion(i.getId, x)
-                        case f: FunctionDef => addForwardDeclartion(f.declarator.getId, x)
+                        case i: InitDeclarator => putForwardDeclaration(i.getId, x)
+                        case f: FunctionDef => putForwardDeclaration(f.declarator.getId, x)
                         case k =>
                     }
                 })
@@ -266,9 +266,9 @@ trait CDeclUse extends CDeclUseInterface with CEnv with CEnvCache {
         entry match {
             case i@Id(name) =>
                 if (env.enumEnv.containsKey(name)) {
-                    val enumDeclarationFeature = env.enumEnv.get(name).get._1
-                    val enumDeclarationId = env.enumEnv.get(name).get._2
-                    if (feature.equivalentTo(FeatureExprFactory.True) || (feature.implies(enumDeclarationFeature).isTautology())) {
+                    val enumDeclarationFeature = env.enumEnv(name)._1
+                    val enumDeclarationId = env.enumEnv(name)._2
+                    if (feature.equivalentTo(FeatureExprFactory.True) || feature.implies(enumDeclarationFeature).isTautology()) {
                         addToDeclUseMap(enumDeclarationId, i)
                     }
                 }
@@ -284,10 +284,10 @@ trait CDeclUse extends CDeclUseInterface with CEnv with CEnvCache {
                 case One(FunctionDef(_, AtomicNamedDeclarator(_, key, _), _, _)) => addToDeclUseMap(key, use)
                 case One(Enumerator(key, _)) => addToDeclUseMap(key, use)
                 case One(Declaration(specifiers, inits)) =>
-                    inits.foreach(x => x match {
+                    inits.foreach {
                         case Opt(_, entry) => addOne(One(entry), use, env)
                         case _ =>
-                    })
+                    }
                 case _ =>
             }
         }
@@ -372,10 +372,10 @@ trait CDeclUse extends CDeclUseInterface with CEnv with CEnvCache {
                     // Workaround for typedefs in sizeof expressions, current typesystem does not check these
                     if (env.typedefEnv.getAstOrElse(use.name, null) != null) {
                         addTypeUse(use, env, feature)
-                    } else if (env.structEnv.someDefinition(use.name, true)) {
-                        addStructDeclUse(use, env, true, feature)
-                    } else if (env.structEnv.someDefinition(use.name, false)) {
-                        addStructDeclUse(use, env, false, feature)
+                    } else if (env.structEnv.someDefinition(use.name, isUnion = true)) {
+                        addStructDeclUse(use, env, isUnion = true, feature)
+                    } else if (env.structEnv.someDefinition(use.name, isUnion = false)) {
+                        addStructDeclUse(use, env, isUnion = false, feature)
                     }
                 // TODO Enums, TypeDefs and Structs
                 case _ =>
@@ -474,7 +474,7 @@ trait CDeclUse extends CDeclUseInterface with CEnv with CEnvCache {
         }
 
         val idElements = getIdElements(entry)
-        idElements.foreach(x => x match {
+        idElements.foreach {
             case TypeDefTypeSpecifier(id) =>
             case CastExpr(typ, LcurlyInitializer(lst)) =>
                 addUseCastExpr(typ, addUse _, feature, env, lst)
@@ -514,11 +514,11 @@ trait CDeclUse extends CDeclUseInterface with CEnv with CEnvCache {
                     }
                 }
             case k =>
-        })
+        }
     }
 
 
-    override def addOldStyleParameters(oldStyleParameters: List[Opt[OldParameterDeclaration]], declarator: Declarator, expr: FeatureExpr, env: Env) = {
+    override def addOldStyleParameters(oldStyleParameters: List[Opt[OldParameterDeclaration]], declarator: Declarator, expr: FeatureExpr, env: Env): Unit = {
 
         def addDeclIdList(d: DeclIdentifierList, oldStyleId: Id, expr: FeatureExpr) {
             for (Opt(idFeature, id) <- d.idList)
@@ -566,10 +566,10 @@ trait CDeclUse extends CDeclUseInterface with CEnv with CEnvCache {
 
     override def addStructUse(entry: AST, featureExpr: FeatureExpr, env: Env, structName: String, isUnion: Boolean) {
         entry match {
-            case i@Id(name) => {
+            case i@Id(name) =>
                 if (env.structEnv.someDefinition(structName, isUnion)) {
                     val validFields = getFieldsForFeature(env.structEnv, structName, isUnion, featureExpr).map(x => x.getAstOrElse(i.name, null))
-                    validFields.foreach(x => x match {
+                    validFields.foreach {
                         case One(null) =>
                             addStructDeclUse(i, env, isUnion, featureExpr)
                         case One(AtomicNamedDeclarator(_, i2: Id, _)) =>
@@ -581,7 +581,7 @@ trait CDeclUse extends CDeclUseInterface with CEnv with CEnvCache {
                         case One(NestedNamedDeclarator(_, AtomicNamedDeclarator(_, i2: Id, _), _, _)) =>
                             addToDeclUseMap(i2, i)
                         case k =>
-                    })
+                    }
                 } else {
                     env.typedefEnv.getAstOrElse(i.name, null) match {
                         case One(i2: Id) =>
@@ -595,7 +595,6 @@ trait CDeclUse extends CDeclUseInterface with CEnv with CEnvCache {
                         case k =>
                     }
                 }
-            }
             case OffsetofMemberDesignatorID(id) =>
                 addStructUse(id, featureExpr, env, structName, isUnion)
             case k =>
@@ -699,13 +698,13 @@ trait CDeclUse extends CDeclUseInterface with CEnv with CEnvCache {
     }
 
     private def addGotoStatements(f: AST) {
-        val labelMap: IdentityHashMap[Id, FeatureExpr] = new IdentityHashMap()
+        val labelMap: util.IdentityHashMap[Id, FeatureExpr] = new util.IdentityHashMap()
 
         def get[T](a: Any)(implicit m: ClassTag[T]): List[Opt[T]] = {
             a match {
                 // TODO: Feature does not have to be true
-                case c: One[_] if (m.runtimeClass.isInstance(c.value)) => List(Opt(FeatureExprFactory.True, c.value.asInstanceOf[T]))
-                case o: Opt[_] if (m.runtimeClass.isInstance(o.entry)) => List(o.asInstanceOf[Opt[T]])
+                case c: One[_] if m.runtimeClass.isInstance(c.value) => List(Opt(FeatureExprFactory.True, c.value.asInstanceOf[T]))
+                case o: Opt[_] if m.runtimeClass.isInstance(o.entry) => List(o.asInstanceOf[Opt[T]])
                 case l: List[_] => l.flatMap(x => get[T](x))
                 case p: Product => p.productIterator.toList.flatMap(x => get[T](x))
                 case _ => List()
@@ -729,7 +728,7 @@ trait CDeclUse extends CDeclUseInterface with CEnv with CEnvCache {
     // Copy / Pasted from ASTNavigation -> unable to include ASTNavigation because of dependencies
     private def filterASTElements[T <: AST](a: Any)(implicit m: ClassTag[T]): List[T] = {
         a match {
-            case p: Product if (m.runtimeClass.isInstance(p)) => List(p.asInstanceOf[T])
+            case p: Product if m.runtimeClass.isInstance(p) => List(p.asInstanceOf[T])
             case l: List[_] => l.flatMap(filterASTElements[T])
             case p: Product => p.productIterator.toList.flatMap(filterASTElements[T])
             case _ => List()
@@ -740,7 +739,7 @@ trait CDeclUse extends CDeclUseInterface with CEnv with CEnvCache {
     def checkDefuse(ast: AST, declUseMap: IdentityIdHashMap, useDeclMap: IdentityIdHashMap, fm: FeatureModel = FeatureExprLib.featureModelFactory().empty): (String, Int, Int, Int) = {
         def getAllRelevantIds(a: Any): List[Id] = {
             a match {
-                case id: Id => if (!(id.name.startsWith("__builtin"))) List(id) else List()
+                case id: Id => if (!id.name.startsWith("__builtin")) List(id) else List()
                 case gae: GnuAsmExpr => List()
                 case l: List[_] => l.flatMap(x => getAllRelevantIds(x))
                 case p: Product => p.productIterator.toList.flatMap(x => getAllRelevantIds(x))
