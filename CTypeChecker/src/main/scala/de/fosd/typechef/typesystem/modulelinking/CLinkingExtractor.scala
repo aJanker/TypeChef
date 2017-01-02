@@ -1,4 +1,4 @@
-package de.fosd.typechef.typesystem.linking
+package de.fosd.typechef.typesystem.modulelinking
 
 import de.fosd.typechef.conditional.{Conditional, Opt}
 import de.fosd.typechef.error.Position
@@ -34,11 +34,8 @@ trait CLinkingExtractor extends CTypeSystem with CDeclUse with CDeclTyping with 
     def getExportedNames: List[ExportSignature] = exportedNames.flatMap(toExportSignature)
     def getImportedNames: List[ImportSignature] = getUncoveredImports(importedNames, exportedNames).flatMap(toImportSignature)
 
-    def getLinkMap : CLinkMap = new CLinkMap(getExportedNames, getImportedNames)
-
-    def save(): Unit = {
-        println(getExportedNames)
-    }
+    def getVarLinkMap: CLinkMap = new CLinkMap(getExportedNames, getImportedNames)
+    def getFunctionLinkMap: CLinkMap = new CLinkMap(getExportedFunctions, getImportedFunctions)
 
     /**
       * all nonstatic function definitions are considered as exports
@@ -74,12 +71,12 @@ trait CLinkingExtractor extends CTypeSystem with CDeclUse with CDeclTyping with 
     override protected def typedExpr(expr: Expr, ctypes: Conditional[CType], featureExpr: FeatureExpr, env: Env) {
         super.typedExpr(expr, ctypes, featureExpr, env)
         expr match {
-            case identifier: Id =>
+            case identifier: Id if !hasSystemSpecificName(identifier.name) => // silently ignore system linked functions for now
                 val deadCondition = env.isDeadCode
 
                 for ((fexpr, ctype) <- ctypes.toList) {
                     val localFexpr = fexpr and featureExpr andNot deadCondition
-                    if (!ctype.isUnknown && (localFexpr isSatisfiable))
+                    if (!ctype.isUnknown && (localFexpr isSatisfiable()))
 
                         if (ctype.isFunction) // all function declarations without definitions are imports if they are referenced at least once
                             isParameter(identifier.name, env).vmap(localFexpr,
@@ -105,6 +102,12 @@ trait CLinkingExtractor extends CTypeSystem with CDeclUse with CDeclTyping with 
     }
 
     /**
+      * Checks if a name is linked by the C system platform (i.e. printf)
+      */
+    private def hasSystemSpecificName(name: String): Boolean =
+        name.startsWith("__builtin_") || SystemLinker.allLibs.contains(name)
+
+    /**
       * Checks if a variable name is a part of linking and is defined in the local file scope (-> name gets exported)
       */
     private def isExportedDefinition(name: String, env: Env): Conditional[Boolean] =
@@ -123,14 +126,6 @@ trait CLinkingExtractor extends CTypeSystem with CDeclUse with CDeclTyping with 
       */
     private def isParameter(name: String, env: Env): Conditional[Boolean] =
         env.varEnv.lookupKind(name).map(_ == KParameter)
-
-    /**
-      * check that the id refers to a parameter instead of to a function or variable
-      *
-      * returns true if scope==0
-      */
-    private def isExternallyDefined(name: String, env: Env): FeatureExpr =
-        env.varEnv.lookupIsExternalLinkage(name)
 
     /**
       * remove imports that are covered by exports and/or static names
@@ -163,7 +158,7 @@ trait CLinkingExtractor extends CTypeSystem with CDeclUse with CDeclTyping with 
             }
         }
 
-        importMap.iterator.toList flatMap { case (k, v) => v._4.map { id => (CSignature(k._1, k._2, v._1, v._2, v._3), id) } }
+        importMap.iterator.toList flatMap { case (k, v) => v._4.map { id => (CSignature(k._1, k._2, v._1, v._2, v._3), id) } } distinct
     }
 
 
