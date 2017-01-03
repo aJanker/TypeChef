@@ -38,7 +38,7 @@ trait CLinkingExtractor extends CTypeSystem with CDeclUse with CDeclTyping with 
     def getFDefLinkingMap: CLinkMap = new CLinkMap(getExportedFunctions, getImportedFunctions)
 
     override def addedDecl(decl: Declaration, featureExpr: FeatureExpr, env: Env): Unit = {
-        //        super.addedDecl(decl, featureExpr, env)
+        super.addedDecl(decl, featureExpr, env)
         decl.init.foreach(init => {
             val deadCondition = env.isDeadCode
             val initCondition = init.condition
@@ -47,17 +47,7 @@ trait CLinkingExtractor extends CTypeSystem with CDeclUse with CDeclTyping with 
 
             for ((fexpr, ctype) <- ctypes.toList) {
                 val localFexpr = fexpr and featureExpr andNot deadCondition
-                // if a variable is detected by the type system to be linked, we consider a definition (e.g. extern int x; int x = y;) of that variable as export.
-                isExportedDefinition(identifier.name, env).vmap(localFexpr,
-                    (f, e) => if (e)
-                        exportedNames ::= (CSignature(identifier.name, ctype, f, Seq(identifier.getPositionFrom), Set()), identifier)
-                )
-
-                // if a variable is detected by the type system to be linked, we consider the presence of a declaration only of that variable as import.
-                isImportedDeclaration(identifier.name, env).vmap(localFexpr,
-                    (f, e) => if (e)
-                        importedNames ::= (CSignature(identifier.name, ctype, f, Seq(identifier.getPositionFrom), Set()), identifier)
-                )
+                checkForLinkedVariable(env, identifier, ctype, localFexpr)
             }
         })
     }
@@ -108,24 +98,25 @@ trait CLinkingExtractor extends CTypeSystem with CDeclUse with CDeclTyping with 
                                 (f, e) => if (!e)
                                     importedFunctions ::= (CSignature(identifier.name, ctype, f, Seq(identifier.getPositionFrom), Set()), identifier)
                             )
-                        else {
-                            // if a variable is detected by the type system to be linked, we consider a definition (e.g. extern int x; int x = y;) of that variable as export.
-                            isExportedDefinition(identifier.name, env).vmap(localFexpr,
-                                (f, e) => if (e)
-                                    exportedNames ::= (CSignature(identifier.name, ctype, f, Seq(identifier.getPositionFrom), Set()), identifier)
-                            )
-
-                            // if a variable is detected by the type system to be linked, we consider the presence of a declaration only of that variable as import.
-                            isImportedDeclaration(identifier.name, env).vmap(localFexpr,
-                                (f, e) => if (e)
-                                    importedNames ::= (CSignature(identifier.name, ctype, f, Seq(identifier.getPositionFrom), Set()), identifier)
-                            )
-                        }
+                        else checkForLinkedVariable(env, identifier, ctype, localFexpr)
                 }
             case _ =>
         }
     }
 
+    private def checkForLinkedVariable(env: Env, identifier: Id, ctype: CType, localFexpr: FeatureExpr) = {
+        // if a variable is detected by the type system to be linked, we consider a definition (e.g. extern int x; int x = y;) of that variable as export.
+        isExportedDefinition(identifier.name, env).vmap(localFexpr,
+            (f, e) => if (e)
+                exportedNames ::= (CSignature(identifier.name, ctype, f, Seq(identifier.getPositionFrom), Set()), identifier)
+        )
+
+        // if a variable is detected by the type system to be linked, we consider the presence of a declaration only of that variable as import.
+        isImportedDeclaration(identifier.name, env).vmap(localFexpr,
+            (f, e) => if (e)
+                importedNames ::= (CSignature(identifier.name, ctype, f, Seq(identifier.getPositionFrom), Set()), identifier)
+        )
+    }
     /**
       * Checks if a name is linked by the C system platform (i.e. printf)
       */

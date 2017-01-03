@@ -167,10 +167,11 @@ object Frontend extends EnforceTreeHelper {
                 }
                 if (opt.writeInterface) {
                     stopWatch.start("interfaces")
-                    // ts.save()
-                    CLinkMap.writeToFile(opt.getVarLinkFilename, ts.getFDefLinkingMap)
-                    CLinkMap.writeToFile(opt.getFDefLinkFilename, ts.getVarLinkingMap)
 
+                    CLinkMap.writeToFile(opt.getFDefLinkFilename, ts.getFDefLinkingMap)
+                    CLinkMap.writeToFile(opt.getVarLinkFilename, ts.getVarLinkingMap)
+
+                    // TODO to remove -> old legacy code
                     val interface = ts.getInferredInterface().and(opt.getFilePresenceCondition)
 
                     stopWatch.start("writeInterfaces")
