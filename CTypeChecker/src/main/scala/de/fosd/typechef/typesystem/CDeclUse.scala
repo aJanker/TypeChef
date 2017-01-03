@@ -88,11 +88,10 @@ trait CDeclUse extends CDeclUseInterface with CEnv with CEnvCache {
 
     private[typesystem] def clear() = clearDeclUseMap()
 
-    private def putToDeclUseMap(decl: Id) = {
-        if (!declUseMap.contains(decl)) {
+    private def putToDeclUseMap(decl: Id) =
+        if (!declUseMap.containsKey(decl))
             declUseMap.put(decl, Collections.newSetFromMap[Id](new util.IdentityHashMap()))
-        }
-    }
+
 
     private def addToDeclUseMap(decl: Id, use: Id): Any = {
         if (decl.eq(use) && !declUseMap.containsKey(decl)) {

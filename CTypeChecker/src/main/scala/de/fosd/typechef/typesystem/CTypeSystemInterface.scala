@@ -1,9 +1,9 @@
 package de.fosd.typechef.typesystem
 
-import de.fosd.typechef.parser.c._
-import de.fosd.typechef.error._
 import de.fosd.typechef.conditional.Conditional
+import de.fosd.typechef.error._
 import de.fosd.typechef.featureexpr.FeatureExpr
+import de.fosd.typechef.parser.c._
 
 /**
  * hooks that other analysis can override to collect/cache their own information
@@ -17,6 +17,13 @@ trait CTypeSystemInterface extends CEnv {
      * refined by CTypeCache if desired
      */
     protected def typedExpr(expr: Expr, ctype: Conditional[CType], featureExpr: FeatureExpr, env: Env) {}
+
+    /**
+      * invoked after adding a declaration
+      *
+      * refined by CTypeCache if desired
+      */
+    protected def addedDecl(decl: Declaration, featureExpr: FeatureExpr, env: Env): Unit = {}
 
     /**
      * invoked after typing a function definition (top level declaration, not nested function)

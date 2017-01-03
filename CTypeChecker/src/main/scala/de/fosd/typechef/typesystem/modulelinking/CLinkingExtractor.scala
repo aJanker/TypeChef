@@ -37,6 +37,31 @@ trait CLinkingExtractor extends CTypeSystem with CDeclUse with CDeclTyping with 
     def getVarLinkingMap: CLinkMap = new CLinkMap(getExportedNames, getImportedNames)
     def getFDefLinkingMap: CLinkMap = new CLinkMap(getExportedFunctions, getImportedFunctions)
 
+    override def addedDecl(decl: Declaration, featureExpr: FeatureExpr, env: Env): Unit = {
+        //        super.addedDecl(decl, featureExpr, env)
+        decl.init.foreach(init => {
+            val deadCondition = env.isDeadCode
+            val initCondition = init.condition
+            val identifier = init.entry.declarator.getId
+            val ctypes = env.varEnv.lookupType(identifier.name)
+
+            for ((fexpr, ctype) <- ctypes.toList) {
+                val localFexpr = fexpr and featureExpr andNot deadCondition
+                // if a variable is detected by the type system to be linked, we consider a definition (e.g. extern int x; int x = y;) of that variable as export.
+                isExportedDefinition(identifier.name, env).vmap(localFexpr,
+                    (f, e) => if (e)
+                        exportedNames ::= (CSignature(identifier.name, ctype, f, Seq(identifier.getPositionFrom), Set()), identifier)
+                )
+
+                // if a variable is detected by the type system to be linked, we consider the presence of a declaration only of that variable as import.
+                isImportedDeclaration(identifier.name, env).vmap(localFexpr,
+                    (f, e) => if (e)
+                        importedNames ::= (CSignature(identifier.name, ctype, f, Seq(identifier.getPositionFrom), Set()), identifier)
+                )
+            }
+        })
+    }
+
     /**
       * all nonstatic function definitions are considered as exports
       *
