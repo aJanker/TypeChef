@@ -225,7 +225,7 @@ trait CLinkingExtractor extends CTypeSystem with CDeclUse with CDeclTyping with 
             } else if (ddm.containsKey(sig._2)) {
                 val declPos = ddm.get(sig._2).map(CLinkingName.apply)
                 Some(apply(declPos, sig._1))
-            } else None
+            } else Some(apply(sig._1.pos, sig._1))
         else None
     }
 }
