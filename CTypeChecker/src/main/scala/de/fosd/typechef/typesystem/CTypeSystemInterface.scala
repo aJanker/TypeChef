@@ -23,7 +23,7 @@ trait CTypeSystemInterface extends CEnv {
       *
       * refined by CTypeCache if desired
       */
-    protected def addedDecl(decl: Declaration, featureExpr: FeatureExpr, env: Env): Unit = {}
+    protected def typedDeclaration(decl: Declaration, featureExpr: FeatureExpr, env: Env): Unit = {}
 
     /**
      * invoked after typing a function definition (top level declaration, not nested function)

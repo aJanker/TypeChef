@@ -42,7 +42,7 @@ trait CTypeSystem extends CTypes with CEnv with CDeclTyping with CTypeEnv with C
             case e: TypelessDeclaration => assertTypeSystemConstraint(false, featureExpr, "will not occur " + e, e); env //ignore
             case d: Declaration =>
                 val newEnv = addDeclarationToEnvironment(d, featureExpr, env)
-                addedDecl(d, featureExpr, newEnv)
+                typedDeclaration(d, featureExpr, newEnv)
                 newEnv
             case fun@FunctionDef(specifiers, declarator, oldStyleParameters, stmt) =>
                 val (funType, newEnv) = checkFunction(fun, specifiers, declarator, oldStyleParameters, stmt, featureExpr, env)

@@ -37,8 +37,8 @@ trait CLinkingExtractor extends CTypeSystem with CDeclUse with CDeclTyping with 
     def getVarLinkingMap: CLinkMap = new CLinkMap(getExportedNames, getImportedNames)
     def getFDefLinkingMap: CLinkMap = new CLinkMap(getExportedFunctions, getImportedFunctions)
 
-    override def addedDecl(decl: Declaration, featureExpr: FeatureExpr, env: Env): Unit = {
-        super.addedDecl(decl, featureExpr, env)
+    override def typedDeclaration(decl: Declaration, featureExpr: FeatureExpr, env: Env): Unit = {
+        super.typedDeclaration(decl, featureExpr, env)
         decl.init.foreach(init => {
             val deadCondition = env.isDeadCode
             val initCondition = init.condition
@@ -207,11 +207,11 @@ trait CLinkingExtractor extends CTypeSystem with CDeclUse with CDeclTyping with 
         flags.filter(_.isDefined).map(_.get).toSet
     }
 
-    private def toExportSignature(export: (CSignature, Id)): Option[ExportSignature] = genericToSignature(export, ExportSignature.apply)
+    private def toExportSignature(export: (CSignature, Id)): Option[ExportSignature] = toSignature(export, ExportSignature.apply)
 
-    private def toImportSignature(importSig: (CSignature, Id)): Option[ImportSignature] = genericToSignature(importSig, ImportSignature.apply)
+    private def toImportSignature(importSig: (CSignature, Id)): Option[ImportSignature] = toSignature(importSig, ImportSignature.apply)
 
-    private def genericToSignature[T <: CLinkingSignature](sig: (CSignature, Id), apply: (Seq[CLinkingName], CSignature) => T): Option[T] = {
+    private def toSignature[T <: CLinkingSignature](sig: (CSignature, Id), apply: (Seq[CLinkingName], CSignature) => T): Option[T] = {
         val udm = getUseDeclMap
         val ddm = getDeclDefMap
 
