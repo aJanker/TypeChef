@@ -2,6 +2,7 @@ package de.fosd.typechef.parser.c
 
 import de.fosd.typechef.conditional.{One, Opt}
 import de.fosd.typechef.error.WithPosition
+import de.fosd.typechef.featureexpr.FeatureExprFactory.True
 
 trait ASTRewriting extends org.bitbucket.inkytonik.kiama.rewriting.CallbackRewriter {
 
@@ -53,6 +54,13 @@ object ASTRewriter extends ASTRewriting {
             //            // we add a Constant("1") at the break
             case ForStatement(None, None, None, One(CompoundStatement(List()))) =>
                 ForStatement(None, Some(Constant("1")), None, One(CompoundStatement(List())))
+            case i@IfStatement(_, thenBranch, _, _) if !thenBranch.forall(_.isInstanceOf[CompoundStatement]) =>
+                // transform single statements of then branch at if branch into compound statement
+                val thenClone = thenBranch.vmap(True, {
+                    case (f, c: CompoundStatement) => c
+                    case (f, s: Statement) => CompoundStatement(List(Opt(f, s)))
+                })
+                i.copy(thenBranch = thenClone)
             case n: AST => n.clone()
         })
         clone(ast).get.asInstanceOf[T]
