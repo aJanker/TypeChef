@@ -321,6 +321,7 @@ case class CLongDouble() extends AType {
 }
 
 case class CPointer(t: AType) extends AType {
+    override def isFunction: Boolean = t.isFunction
     override def toText = t.toText + "*"
 
     def toXML = <pointer>

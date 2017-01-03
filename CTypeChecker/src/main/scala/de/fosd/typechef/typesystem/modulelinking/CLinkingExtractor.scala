@@ -47,7 +47,7 @@ trait CLinkingExtractor extends CTypeSystem with CDeclUse with CDeclTyping with 
 
             for ((fexpr, ctype) <- ctypes.toList) {
                 val localFexpr = fexpr and featureExpr andNot deadCondition
-                if (!(ctype.isFunction || hasSystemSpecificName(identifier.name)) && localFexpr.isSatisfiable())
+                if (!(ctype.isFunction || ctype.isUnknown || hasSystemSpecificName(identifier.name)) && localFexpr.isSatisfiable())
                     checkForLinkedVariable(env, identifier, ctype, localFexpr)
             }
         })
@@ -116,6 +116,7 @@ trait CLinkingExtractor extends CTypeSystem with CDeclUse with CDeclTyping with 
         isImportedDeclaration(identifier.name, env).vmap(localFexpr,
             (f, e) => if (e)
                 importedNames ::= (CSignature(identifier.name, ctype, f, Seq(identifier.getPositionFrom), Set()), identifier)
+
         )
     }
 
@@ -225,7 +226,7 @@ trait CLinkingExtractor extends CTypeSystem with CDeclUse with CDeclTyping with 
             } else if (ddm.containsKey(sig._2)) {
                 val declPos = ddm.get(sig._2).map(CLinkingName.apply)
                 Some(apply(declPos, sig._1))
-            } else Some(apply(sig._1.pos, sig._1))
+            } else Some(apply(Seq(CLinkingName(sig._2)), sig._1))
         else None
     }
 }
