@@ -1,6 +1,6 @@
 package de.fosd.typechef.parser.c
 
-import de.fosd.typechef.conditional.{One, Opt}
+import de.fosd.typechef.conditional.{Conditional, One, Opt}
 import de.fosd.typechef.error.WithPosition
 import de.fosd.typechef.featureexpr.FeatureExprFactory.True
 
@@ -40,6 +40,7 @@ trait ASTRewriting extends org.bitbucket.inkytonik.kiama.rewriting.CallbackRewri
     }
 }
 object ASTRewriter extends ASTRewriting {
+
     // creates an AST without shared objects
     // the parser reuses parsed elements in different subtrees of the AST
     // this method makes sure we create an AST with unique elements
@@ -55,12 +56,9 @@ object ASTRewriter extends ASTRewriting {
             case ForStatement(None, None, None, One(CompoundStatement(List()))) =>
                 ForStatement(None, Some(Constant("1")), None, One(CompoundStatement(List())))
             case i@IfStatement(_, thenBranch, _, _) if !thenBranch.forall(_.isInstanceOf[CompoundStatement]) =>
-                // transform single statements of then branch at if branch into compound statement
-                val thenClone = thenBranch.vmap(True, {
-                    case (f, c: CompoundStatement) => c
-                    case (f, s: Statement) => CompoundStatement(List(Opt(f, s)))
-                })
-                i.copy(thenBranch = thenClone)
+                i.copy(thenBranch = transformSingleStatementToCompoundStatment(thenBranch))
+            case i@IfStatement(_, _, _, Some(elseBranch)) if !elseBranch.forall(_.isInstanceOf[CompoundStatement]) =>
+                i.copy(elseBranch = Some(transformSingleStatementToCompoundStatment(elseBranch)))
             case n: AST => n.clone()
         })
         clone(ast).get.asInstanceOf[T]
@@ -97,5 +95,14 @@ object ASTRewriter extends ASTRewriting {
         })
 
         rewrite(ast).get.asInstanceOf[T]
+    }
+
+    private def transformSingleStatementToCompoundStatment(thenBranch: Conditional[Statement]): Conditional[CompoundStatement] = {
+        // transform single statements of then branch at if branch into compound statement
+        val clone = thenBranch.vmap(True, {
+            case (f, c: CompoundStatement) => c
+            case (f, s: Statement) => CompoundStatement(List(Opt(f, s)))
+        })
+        clone
     }
 }
