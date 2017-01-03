@@ -197,12 +197,17 @@ trait CLinkingExtractor extends CTypeSystem with CDeclUse with CDeclTyping with 
         val udm = getUseDeclMap
         val ddm = getDeclDefMap
 
-        if (udm.containsKey(sig._2) && sig._1.fexpr.isSatisfiable()) {
-            val declPos = udm.get(sig._2).flatMap(decl => {
-                if (ddm.containsKey(decl)) ddm.get(decl).map(CLinkingName.apply)
-                else Some(CLinkingName.apply(decl))
-            })
-            Some(apply(declPos, sig._1))
-        } else None
+        if (sig._1.fexpr.isSatisfiable())
+            if (udm.containsKey(sig._2)) {
+                val declPos = udm.get(sig._2).flatMap(decl => {
+                    if (ddm.containsKey(decl)) ddm.get(decl).map(CLinkingName.apply)
+                    else Some(CLinkingName.apply(decl))
+                })
+                Some(apply(declPos, sig._1))
+            } else if (ddm.containsKey(sig._2)) {
+                val declPos = ddm.get(sig._2).map(CLinkingName.apply)
+                Some(apply(declPos, sig._1))
+            } else None
+        else None
     }
 }
