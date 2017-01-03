@@ -47,7 +47,8 @@ trait CLinkingExtractor extends CTypeSystem with CDeclUse with CDeclTyping with 
 
             for ((fexpr, ctype) <- ctypes.toList) {
                 val localFexpr = fexpr and featureExpr andNot deadCondition
-                checkForLinkedVariable(env, identifier, ctype, localFexpr)
+                if (!(ctype.isFunction || hasSystemSpecificName(identifier.name)) && localFexpr.isSatisfiable())
+                    checkForLinkedVariable(env, identifier, ctype, localFexpr)
             }
         })
     }
@@ -104,7 +105,7 @@ trait CLinkingExtractor extends CTypeSystem with CDeclUse with CDeclTyping with 
         }
     }
 
-    private def checkForLinkedVariable(env: Env, identifier: Id, ctype: CType, localFexpr: FeatureExpr) = if (!ctype.isFunction) {
+    private def checkForLinkedVariable(env: Env, identifier: Id, ctype: CType, localFexpr: FeatureExpr) = {
         // if a variable is detected by the type system to be linked, we consider a definition (e.g. extern int x; int x = y;) of that variable as export.
         isExportedDefinition(identifier.name, env).vmap(localFexpr,
             (f, e) => if (e)
