@@ -104,7 +104,7 @@ trait CLinkingExtractor extends CTypeSystem with CDeclUse with CDeclTyping with 
         }
     }
 
-    private def checkForLinkedVariable(env: Env, identifier: Id, ctype: CType, localFexpr: FeatureExpr) = {
+    private def checkForLinkedVariable(env: Env, identifier: Id, ctype: CType, localFexpr: FeatureExpr) = if (!ctype.isFunction) {
         // if a variable is detected by the type system to be linked, we consider a definition (e.g. extern int x; int x = y;) of that variable as export.
         isExportedDefinition(identifier.name, env).vmap(localFexpr,
             (f, e) => if (e)
@@ -117,6 +117,7 @@ trait CLinkingExtractor extends CTypeSystem with CDeclUse with CDeclTyping with 
                 importedNames ::= (CSignature(identifier.name, ctype, f, Seq(identifier.getPositionFrom), Set()), identifier)
         )
     }
+
     /**
       * Checks if a name is linked by the C system platform (i.e. printf)
       */
