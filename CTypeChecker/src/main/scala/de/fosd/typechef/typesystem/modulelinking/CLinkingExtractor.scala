@@ -34,8 +34,8 @@ trait CLinkingExtractor extends CTypeSystem with CDeclUse with CDeclTyping with 
     def getExportedNames: List[ExportSignature] = exportedNames.flatMap(toExportSignature)
     def getImportedNames: List[ImportSignature] = getUncoveredImports(importedNames, exportedNames).flatMap(toImportSignature)
 
-    def getVarLinkMap: CLinkMap = new CLinkMap(getExportedNames, getImportedNames)
-    def getFunctionLinkMap: CLinkMap = new CLinkMap(getExportedFunctions, getImportedFunctions)
+    def getVarLinkingMap: CLinkMap = new CLinkMap(getExportedNames, getImportedNames)
+    def getFDefLinkingMap: CLinkMap = new CLinkMap(getExportedFunctions, getImportedFunctions)
 
     /**
       * all nonstatic function definitions are considered as exports

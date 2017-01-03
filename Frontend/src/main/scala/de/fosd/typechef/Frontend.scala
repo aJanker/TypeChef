@@ -1,16 +1,15 @@
 package de.fosd.typechef
 
 
-import de.fosd.typechef.parser.c._
-import de.fosd.typechef.typesystem._
-import de.fosd.typechef.crewrite._
 import java.io._
-import parser.TokenReader
-import de.fosd.typechef.options.{FrontendOptionsWithConfigFiles, FrontendOptions, OptionException}
-import de.fosd.typechef.parser.c.CTypeContext
-import de.fosd.typechef.parser.c.TranslationUnit
-import de.fosd.typechef.featureexpr.FeatureExpr
 import java.util.zip.{GZIPInputStream, GZIPOutputStream}
+
+import de.fosd.typechef.crewrite._
+import de.fosd.typechef.options.{FrontendOptions, FrontendOptionsWithConfigFiles, OptionException}
+import de.fosd.typechef.parser.TokenReader
+import de.fosd.typechef.parser.c.{CTypeContext, TranslationUnit, _}
+import de.fosd.typechef.typesystem._
+import de.fosd.typechef.typesystem.modulelinking.{CLinkMap, CLinkingExtractor}
 
 object Frontend extends EnforceTreeHelper {
 
@@ -150,10 +149,7 @@ object Frontend extends EnforceTreeHelper {
             if (ast != null) {
 
                 // some dataflow analyses require typing information
-                val ts = if (opt.typechecksa)
-                            new CTypeSystemFrontend(ast, fullFM, opt) with CTypeCache with CDeclUse
-                         else
-                            new CTypeSystemFrontend(ast, fullFM, opt)
+                val ts = new CTypeSystemFrontend(ast, fullFM, opt) with CTypeCache with CDeclUse with CLinkingExtractor
 
 
                 /** I did some experiments with the TypeChef FeatureModel of Linux, in case I need the routines again, they are saved here. */
@@ -167,10 +163,14 @@ object Frontend extends EnforceTreeHelper {
                     stopWatch.start("typechecking")
                     println("#type checking")
                     ts.checkAST(printResults = true)
-                    ts.errors.map(errorXML.renderTypeError)
+                    ts.errors.foreach(errorXML.renderTypeError)
                 }
                 if (opt.writeInterface) {
                     stopWatch.start("interfaces")
+                    // ts.save()
+                    CLinkMap.writeToFile(opt.getVarLinkFilename, ts.getFDefLinkingMap)
+                    CLinkMap.writeToFile(opt.getFDefLinkFilename, ts.getVarLinkingMap)
+
                     val interface = ts.getInferredInterface().and(opt.getFilePresenceCondition)
 
                     stopWatch.start("writeInterfaces")

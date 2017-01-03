@@ -10,8 +10,8 @@ class CLinkMap(exports: List[ExportSignature] = List(), imports: List[ImportSign
     type ExportSignatures = List[ExportSignature]
     type ImportSignatures = List[ImportSignature]
 
-    private def getExports = exports
-    private def getImports = imports
+    /*private[modulelinking] */ def getExports = exports
+    /* private[modulelinking] */ def getImports = imports
 
     private[modulelinking] val exportsByName: mutable.Map[LinkName, Map[File, ExportSignatures]] = new mutable.HashMap[LinkName, Map[File, ExportSignatures]]()
     private[modulelinking] val importsByName: mutable.Map[LinkName, Map[File, ImportSignatures]] = new mutable.HashMap[LinkName, Map[File, ImportSignatures]]()
@@ -23,10 +23,7 @@ class CLinkMap(exports: List[ExportSignature] = List(), imports: List[ImportSign
 
     def merge(other: CLinkMap): CLinkMap = new CLinkMap(getExports ::: other.getExports, getImports ::: other.getImports)
 
-    // fill map
-
     private def fillMap() = {
-        def emptyNameMap[T <: CLinkingSignature] = new mutable.HashMap[LinkName, Map[File, List[T]]]()
         def emptyFileMap[T <: CLinkingSignature] = new HashMap[File, List[T]]()
         def emptySigList[T <: CLinkingSignature] = List[T]()
 

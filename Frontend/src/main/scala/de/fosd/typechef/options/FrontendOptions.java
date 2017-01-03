@@ -1,6 +1,5 @@
 package de.fosd.typechef.options;
 
-import de.fosd.typechef.VALexer;
 import de.fosd.typechef.error.Position;
 import de.fosd.typechef.featureexpr.FeatureExpr;
 import de.fosd.typechef.featureexpr.FeatureExprFactory$;
@@ -11,7 +10,6 @@ import gnu.getopt.LongOpt;
 import scala.Function3;
 
 import java.io.File;
-import java.util.ArrayList;
 import java.util.List;
 
 
@@ -198,6 +196,14 @@ public class FrontendOptions extends CAnalysisOptions implements ParserOptions {
 
     public String getInterfaceFilename() {
         return outputStem + ".interface";
+    }
+
+    public String getVarLinkFilename() {
+        return outputStem + "_var.link";
+    }
+
+    public String getFDefLinkFilename() {
+        return outputStem + "_fdef.link";
     }
 
     public String getDebugInterfaceFilename() {
