@@ -91,7 +91,7 @@ trait CLinkMapReader {
     def readFromFile(file: String): CLinkMap = fromXML(xml.XML.loadFile(new File(file)))
 
     /**
-      * Converts a linking information in xml to a CLinkMap
+      * Converts linking information from xml to a CLinkMap
       */
     def fromXML(node: xml.Elem): CLinkMap = {
         def _FromXML[T <: CLinkingSignature](parentNode: String, entryNode: String, apply: (Seq[CLinkingName], CSignature) => T): List[T] =

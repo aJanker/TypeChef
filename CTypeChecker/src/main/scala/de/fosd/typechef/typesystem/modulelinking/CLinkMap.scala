@@ -10,8 +10,8 @@ class CLinkMap(exports: List[ExportSignature] = List(), imports: List[ImportSign
     type ExportSignatures = List[ExportSignature]
     type ImportSignatures = List[ImportSignature]
 
-    /*private[modulelinking] */ def getExports = exports
-    /* private[modulelinking] */ def getImports = imports
+    private[modulelinking] def getExports = exports
+    private[modulelinking] def getImports = imports
 
     private[modulelinking] val exportsByName: mutable.Map[LinkName, Map[File, ExportSignatures]] = new mutable.HashMap[LinkName, Map[File, ExportSignatures]]()
     private[modulelinking] val importsByName: mutable.Map[LinkName, Map[File, ImportSignatures]] = new mutable.HashMap[LinkName, Map[File, ImportSignatures]]()
