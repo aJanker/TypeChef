@@ -55,10 +55,23 @@ object ASTRewriter extends ASTRewriting {
             //            // we add a Constant("1") at the break
             case ForStatement(None, None, None, One(CompoundStatement(List()))) =>
                 ForStatement(None, Some(Constant("1")), None, One(CompoundStatement(List())))
+
+            // if (expr)
+            //      singleStmt causes problems for some data-flow analysis strategies
+            // to solve this, we write such expressions into:
+            // if (expr) {
+            //      singleStmt
+            // }
             case i@IfStatement(_, thenBranch, _, _) if !thenBranch.forall(_.isInstanceOf[CompoundStatement]) =>
                 i.copy(thenBranch = transformSingleStatementToCompoundStatment(thenBranch))
             case i@IfStatement(_, _, _, Some(elseBranch)) if !elseBranch.forall(_.isInstanceOf[CompoundStatement]) =>
                 i.copy(elseBranch = Some(transformSingleStatementToCompoundStatment(elseBranch)))
+            case w@WhileStatement(_, s) if !s.forall(_.isInstanceOf[CompoundStatement]) =>
+                w.copy(s = transformSingleStatementToCompoundStatment(s))
+            case d@DoStatement(_, s) if !s.forall(_.isInstanceOf[CompoundStatement]) =>
+                d.copy(s = transformSingleStatementToCompoundStatment(s))
+            case f@ForStatement(_, _, _, s) if !s.forall(_.isInstanceOf[CompoundStatement]) =>
+                f.copy(s = transformSingleStatementToCompoundStatment(s))
             case n: AST => n.clone()
         })
         clone(ast).get.asInstanceOf[T]
