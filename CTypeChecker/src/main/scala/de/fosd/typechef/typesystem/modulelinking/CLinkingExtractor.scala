@@ -18,6 +18,9 @@ trait CLinkingExtractor extends CTypeSystem with CDeclUse with CDeclTyping with 
     private var importedFunctions: List[(CSignature, Id)] = List()
     private var staticFunctions: List[(CSignature, Id)] = List()
 
+    private lazy val varLinkingMap = new CLinkMap(getExportedNames, getImportedNames)
+    private lazy val fDefLinkingMap = new CLinkMap(getExportedFunctions, getImportedFunctions)
+
     /**
       * Exported names are variables which are declared with the keyword extern and in the current scope a corresponding definition is found.
       */
@@ -34,8 +37,8 @@ trait CLinkingExtractor extends CTypeSystem with CDeclUse with CDeclTyping with 
     def getExportedNames: List[ExportSignature] = exportedNames.flatMap(toExportSignature)
     def getImportedNames: List[ImportSignature] = getUncoveredImports(importedNames, exportedNames).flatMap(toImportSignature)
 
-    def getVarLinkingMap: CLinkMap = new CLinkMap(getExportedNames, getImportedNames)
-    def getFDefLinkingMap: CLinkMap = new CLinkMap(getExportedFunctions, getImportedFunctions)
+    def getVarLinkingMap: CLinkMap = varLinkingMap
+    def getFDefLinkingMap: CLinkMap = fDefLinkingMap
 
     override def typedDeclaration(decl: Declaration, featureExpr: FeatureExpr, env: Env): Unit = {
         super.typedDeclaration(decl, featureExpr, env)
@@ -116,7 +119,6 @@ trait CLinkingExtractor extends CTypeSystem with CDeclUse with CDeclTyping with 
         isImportedDeclaration(identifier.name, env).vmap(localFexpr,
             (f, e) => if (e)
                 importedNames ::= (CSignature(identifier.name, ctype, f, Seq(identifier.getPositionFrom), Set()), identifier)
-
         )
     }
 
