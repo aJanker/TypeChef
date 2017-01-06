@@ -12,7 +12,7 @@ trait ASTRewriting extends org.bitbucket.inkytonik.kiama.rewriting.CallbackRewri
     override def rewriting[T](oldTerm: T, newTerm: T): T = {
         (oldTerm, newTerm) match {
             case (source: WithPosition, target: WithPosition) => target.range = source.range
-            case (o@Opt(_, source: WithPosition), o2@Opt(_, target: WithPosition)) => target.range = source.range
+            case (Opt(_, source: WithPosition), Opt(_, target: WithPosition)) => target.range = source.range
             case _ =>
         }
         newTerm
