@@ -1,8 +1,7 @@
 package de.fosd.typechef.parser.c
 
-import de.fosd.typechef.conditional.{Conditional, One, Opt}
+import de.fosd.typechef.conditional.{One, Opt}
 import de.fosd.typechef.error.WithPosition
-import de.fosd.typechef.featureexpr.FeatureExprFactory.True
 
 trait ASTRewriting extends org.bitbucket.inkytonik.kiama.rewriting.CallbackRewriter {
 
@@ -13,6 +12,7 @@ trait ASTRewriting extends org.bitbucket.inkytonik.kiama.rewriting.CallbackRewri
     override def rewriting[T](oldTerm: T, newTerm: T): T = {
         (oldTerm, newTerm) match {
             case (source: WithPosition, target: WithPosition) => target.range = source.range
+            case (o@Opt(_, source: WithPosition), o2@Opt(_, target: WithPosition)) => target.range = source.range
             case _ =>
         }
         newTerm
@@ -53,25 +53,10 @@ object ASTRewriter extends ASTRewriting {
             //            // so if we omit CompoundStatement in succ pred determination, we need an expression
             //            // so that succ(e) -> e and pred(e) is e
             //            // we add a Constant("1") at the break
-            case ForStatement(None, None, None, One(CompoundStatement(List()))) =>
-                ForStatement(None, Some(Constant("1")), None, One(CompoundStatement(List())))
-
-            // if (expr)
-            //      singleStmt causes problems for some data-flow analysis strategies
-            // to solve this, we write such expressions into:
-            // if (expr) {
-            //      singleStmt
-            // }
-            case i@IfStatement(_, thenBranch, _, _) if !thenBranch.forall(_.isInstanceOf[CompoundStatement]) =>
-                i.copy(thenBranch = transformSingleStatementToCompoundStatment(thenBranch))
-            case i@IfStatement(_, _, _, Some(elseBranch)) if !elseBranch.forall(_.isInstanceOf[CompoundStatement]) =>
-                i.copy(elseBranch = Some(transformSingleStatementToCompoundStatment(elseBranch)))
-            case w@WhileStatement(_, s) if !s.forall(_.isInstanceOf[CompoundStatement]) =>
-                w.copy(s = transformSingleStatementToCompoundStatment(s))
-            case d@DoStatement(_, s) if !s.forall(_.isInstanceOf[CompoundStatement]) =>
-                d.copy(s = transformSingleStatementToCompoundStatment(s))
-            case f@ForStatement(_, _, _, s) if !s.forall(_.isInstanceOf[CompoundStatement]) =>
-                f.copy(s = transformSingleStatementToCompoundStatment(s))
+            case f@ForStatement(None, None, None, One(CompoundStatement(List()))) =>
+                val rewrite = ForStatement(None, Some(Constant("1")), None, One(CompoundStatement(List())))
+                rewrite.range = f.range
+                rewrite
             case n: AST => n.clone()
         })
         clone(ast).get.asInstanceOf[T]
@@ -108,14 +93,5 @@ object ASTRewriter extends ASTRewriting {
         })
 
         rewrite(ast).get.asInstanceOf[T]
-    }
-
-    private def transformSingleStatementToCompoundStatment(thenBranch: Conditional[Statement]): Conditional[CompoundStatement] = {
-        // transform single statements of then branch at if branch into compound statement
-        val clone = thenBranch.vmap(True, {
-            case (f, c: CompoundStatement) => c
-            case (f, s: Statement) => CompoundStatement(List(Opt(f, s)))
-        })
-        clone
     }
 }

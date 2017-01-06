@@ -10,8 +10,7 @@ object ProductDerivation extends ASTRewriting {
         val prod = manytd(rule[Product] {
             case l: List[_] if l.forall(_.isInstanceOf[Opt[_]]) =>
                 l.flatMap {
-                    case o@Opt(_, entry: Product) if o.condition.evaluate(selectedFeatures) =>
-                        Some(Opt(condition, deriveProduct(entry, selectedFeatures, condition)))
+                    case o: Opt[_] if o.condition.evaluate(selectedFeatures) => Some(o.copy(condition = condition))
                     case _ => None
                 }
             case Choice(feature, thenBranch, elseBranch) =>
@@ -21,7 +20,6 @@ object ProductDerivation extends ASTRewriting {
         })
 
         val cast = prod(ast).get.asInstanceOf[T]
-        checkPositionInformation(cast)
         cast
     }
 }
