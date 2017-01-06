@@ -171,7 +171,7 @@ trait CDeclUse extends CDeclUseInterface with CEnv with CEnvCache {
     private def addForwardDeclaration(env: Env, declaration: Id, feature: FeatureExpr) {
 
         def swapDeclaration(originalDecl: Id, newDecl: Id) = {
-            if (!originalDecl.eq(newDecl)) {
+            if (!originalDecl.eq(newDecl) && declUseMap.containsKey(originalDecl)) {
                 putToDeclUseMap(newDecl)
                 addToDeclUseMap(newDecl, originalDecl)
                 declUseMap.get(originalDecl).foreach(addToDeclUseMap(newDecl, _))
